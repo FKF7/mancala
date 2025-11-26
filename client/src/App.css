@@ -1,0 +1,25 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+  background-color: white;
+}
+
+@keyframes colorShift {
+  from {
+        fill: goldenrod;
+  }
+  to {
+      fill: rgb(218, 182, 91);
+  }
+}
+
+.tile.clickable {
+  cursor: pointer;
+}
+
+.numMove.selected {
+  fill: #ff8f45;
+  stroke: #ff6600;
+};

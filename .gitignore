@@ -3,3 +3,5 @@
 /client/node_modules
 /rustServer/target
 /rustServer/rustServer
+/.vscode
+/rustServer/data

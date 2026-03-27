@@ -1,10 +1,18 @@
 /* Basic styles for the Mancala board layout */
+.board-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #e0a523;
+  border-radius: 30px;
+}
+
 .board {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #e0a523;
-  padding: 10px;
+  padding: 5px 10px;
 }
 
 .store {
@@ -61,18 +69,39 @@
 
 .hint-grid {
   display: grid;
-  grid-template-rows: repeat(2, 1fr);
+  vertical-align: middle;
   grid-template-columns: repeat(6, 60px);
   gap: 10px;
+  padding: 5px 0px
 }
 
 .hint {
   width: 60px;
-  height: 10px;
+  height: 30px;
   display: flex;
   justify-content: center;
   align-items: center;
   border-radius: 50%;
   font-weight: bold;
   font-size: 18px;
+  color: #2f2e2e;
+  background-color: #e0dc02;
+}
+
+.hint.unknown {
+  color: white
+}
+
+.hint.disabled {
+  background-color: #f3f173;
+}
+
+.hint.completed {
+  background-color: #73f3e0;
+  color: #2f2e2e;
+}
+
+.pit-icon {
+  width: 15px;
+  height: 15px;
 }

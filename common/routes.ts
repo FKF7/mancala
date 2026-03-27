@@ -17,6 +17,8 @@ const Routes = Object.freeze({
         },
         MANCALA: {
             MAKE_MOVE: '/make_move',
+            GET_HINT_DATA: '/get_hint_data',
+            SAVE_NEW_BOARD: '/save_new_board',
             SIMULATE_GAME: '/simulate',
         },
     }

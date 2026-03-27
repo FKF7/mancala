@@ -1,8 +1,7 @@
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde_json::json;
 use thiserror::Error;
-
-pub type ApiResult<T> = Result<T, ApiError>;
+use std::fmt;
 
 #[derive(Debug, Error)]
 pub enum ApiError {
@@ -20,4 +19,29 @@ impl IntoResponse for ApiError {
         };
         (code, Json(json!({ "error": msg }))).into_response()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CodecError {
+    ValueOutOfRange { board_side: usize, pit: usize, value: u8 },
+    InvalidTurn,
+}
+
+impl fmt::Display for CodecError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CodecError::ValueOutOfRange { board_side, pit, value } => {
+                write!(f, "pit value out of range at [{board_side}][{pit}]: {value}")
+            }
+            CodecError::InvalidTurn => write!(f, "Invalid turn value, expected 0 or 1"),
+        }
+    }
+}
+
+impl std::error::Error for CodecError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MoveError {
+    InvalidMove,
+    InvalidTurn
 }

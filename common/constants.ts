@@ -14,7 +14,12 @@ const Constants = Object.freeze({
         ],
         INITIAL_TURN: 0,
         FULL_CYCLE: 13,
-        EMPTY_HINT: 0
+        HINT_TYPE: {
+            NORMAL: 0,
+            UNKNOWN: 64,
+            COMPLETED: 128,
+            INVALID: 192
+        }
     },
     PLAYERS: {
         PLAYER1: 0,

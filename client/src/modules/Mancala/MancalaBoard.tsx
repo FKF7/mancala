@@ -7,19 +7,33 @@ import { MancalaTurn, Pit, Hint } from '../../../../common/types.ts';
 import { executeGETRequest } from '../../utils/requestExecutor.ts';
 import Routes from '../../../../common/routes';
 import History from '../../../../common/models/history.ts';
+import { getHintData, makeMove } from '../../lib/requests.ts';
+import MancalaKeyBinds from './MancalaKeyBinds.ts';
 
-export default function MancalaBoard(game2: MancalaGame) {
-  const [game, setGame] = useState(new MancalaGame());
-  const [history] = useState(() => new History(game));
-  const hint = new Array(6).fill(Constants.MANCALA.EMPTY_HINT);
+type MancalaBoardProps = {
+  game: MancalaGame;
+  setGame: React.Dispatch<React.SetStateAction<MancalaGame>>;
+  history: History;
+  hints: Hint[];
+  mancalaKeysHandler: MancalaKeyBinds;
+}
+
+export default function MancalaBoard({ game, setGame, history, hints, mancalaKeysHandler }: MancalaBoardProps) {
+  const hintsShouldBeShown = true;
+
+  useEffect(() => {
+    mancalaKeysHandler.setAction("movePit", onPitClick);
+  }, [game]);
 
   async function onPitClick(pit: Pit) {
-    let newGame = await executeGETRequest(`${Routes.BASE_URL}${Routes.API_URL.MANCALA}${Routes.ENDPOINTS.MANCALA.MAKE_MOVE}`,
-      { pit, game: JSON.stringify(game) });
-
-    newGame = new MancalaGame(newGame.board, newGame.currentTurn as MancalaTurn)
-    setGame(newGame);
-    history.add(newGame);
+    if (game.getCurrentBoardPit(pit) === 0) {
+      return;
+    }
+    let newGame = await makeMove(game, pit);
+    if (newGame) {
+      setGame(newGame);
+      history.add(newGame);
+    }
   }
 
   function drawPit(player: MancalaTurn, pit: Pit) {
@@ -32,8 +46,6 @@ export default function MancalaBoard(game2: MancalaGame) {
       </div>
     )
   }
-
-  
 
   function drawPlayer1Pits() {
     const pits: ReactElement[] = []
@@ -51,31 +63,76 @@ export default function MancalaBoard(game2: MancalaGame) {
     return pits;
   }
 
-  function onResetButtonClick() {
-    let newGame = new MancalaGame();
-    setGame(newGame);
-    history.reset(newGame);
+  function drawHint(hint: Hint, player: MancalaTurn) {
+    if (!hintsShouldBeShown) {
+      return (
+        <div className='hint disabled'>
+          <img className="pit-icon" src="../../dist/hiddenIcon.png" alt="Hidden" />
+        </div>
+      );
+    }
+
+    if (game.getCurrentTurn() !== player) {
+      return (
+        <div className='hint disabled'>
+          <img className="pit-icon" src="../../dist/forbiddenIcon.png" alt="Forbidden" />
+        </div>
+      )
+    }
+
+    switch (hint?.hintType) {
+      case Constants.MANCALA.HINT_TYPE.NORMAL:
+        return (
+          <div className='hint'>
+            {hint.value}
+          </div>
+        );
+      case Constants.MANCALA.HINT_TYPE.UNKNOWN:
+        return (
+          <div className='hint unknown'>
+            ?
+          </div>
+        );
+      case Constants.MANCALA.HINT_TYPE.COMPLETED:
+        return (
+          <div className='hint completed'>
+            {hint.value}
+          </div>
+        );
+      case Constants.MANCALA.HINT_TYPE.INVALID:
+        return (
+          <div className='hint disabled'>
+            <img className="pit-icon" src="../../dist/forbiddenIcon.png" alt="Forbidden" />
+          </div>
+        );
+      default:
+        return <div className='hint weird'>
+          ??
+        </div>
+    }
   }
 
-  async function onSimulateButtonClick() {
-    // Vai por mim, melhor não kkkk
-    // let newGame = await executeGETRequest(`${Routes.BASE_URL}${Routes.API_URL.MANCALA}${Routes.ENDPOINTS.MANCALA.SIMULATE_GAME}`, {});
+  function drawPlayer1Hints() {
+    const hintElements: ReactElement[] = []
+    for (let i = 5; i >= 0; i--) {
+      hintElements.push(drawHint(hints[i], Constants.PLAYERS.PLAYER1 as MancalaTurn));
+    }
+    return hintElements;
   }
 
-  function onZClick() {
-    setGame(history.back());
-  }
-
-  function onFixClick() {
-    history.fix();
-  }
-
-  function onYClick() {
-    setGame(history.forward());
+  function drawPlayer2Hints() {
+    const hintElements: ReactElement[] = []
+    for (let i = 0; i < 6; i++) {
+      hintElements.push(drawHint(hints[i], Constants.PLAYERS.PLAYER2 as MancalaTurn));
+    }
+    return hintElements;
   }
 
   return (
-    <div>
+    <div className="board-container">
+      <div className='hint-grid'>
+        {drawPlayer2Hints()}
+      </div>
       <div className="board">
         <div className="store player2Board">{game.getPit(Constants.PLAYERS.PLAYER2 as MancalaTurn, 0)}</div>
         <div className="pit-grid">
@@ -84,15 +141,10 @@ export default function MancalaBoard(game2: MancalaGame) {
         </div>
         <div className="store player1Board">{game.getPit(Constants.PLAYERS.PLAYER1 as MancalaTurn, 0)}</div>
       </div>
-      
-      <div className="buttons">
-        <button onClick={onResetButtonClick}>Reset</button>
-        <button onClick={onSimulateButtonClick}>Simulate</button>
-
-        <button onClick={onZClick}>Z</button>
-        <button onClick={onFixClick}>Fix</button>
-        <button onClick={onYClick}>Y</button>
+      <div className='hint-grid'>
+        {drawPlayer1Hints()}
       </div>
     </div>
   );
+  
 }

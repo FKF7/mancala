@@ -7,52 +7,52 @@ import { MancalaTurn, Pit, Hint } from '../../../../common/types.ts';
 import { executeGETRequest } from '../../utils/requestExecutor.ts';
 import Routes from '../../../../common/routes';
 import History from '../../../../common/models/history.ts';
-import MancalaBoard from './MancalaBoard.tsx';
+import MancalaBoard from './MancalaBoard';
+import { getHintData, simulate } from '../../lib/requests.ts';
+import MancalaKeyBinds from "./MancalaKeyBinds";
 
 export default function MancalaTable() {
-  const game = new MancalaGame()
+  const [game, setGame] = useState(() => new MancalaGame());
+  const [hints, setHints] = useState<Hint[]>([]);
+
+  useEffect(() => {
+    getHintData(game).then((hints) => {
+      if (hints) {
+        setHints(hints)
+      } else {
+        setHints([]);
+      }
+    });
+  }, [game]);
+
   const [history] = useState(() => new History(game));
-  const hint = new Array(6).fill(Constants.MANCALA.EMPTY_HINT);
-  const a = MancalaBoard(game);
 
-  function drawHint(hint: number) {
-    return (
-      <div className='hint'>
-        {hint}
-      </div>
-    )
-  }
+  
+  
+  const mancalaKeysHandler = new MancalaKeyBinds();
 
-  function drawPlayer1Hints() {
-    const hints: ReactElement[] = []
-    for (let i = 5; i >= 0; i--) {
-      hints.push(drawHint(hint[i]));
-    }
-    return hints;
-  }
+  useEffect(() => {
+    mancalaKeysHandler.setAction("undo", onZClick);
+    mancalaKeysHandler.setAction("redo", onYClick);
+    mancalaKeysHandler.setAction("reset", onResetButtonClick);
+  }, []);
+  
 
-  function drawPlayer2Hints() {
-    const hints: ReactElement[] = []
-    for (let i = 0; i < 6; i++) {
-      hints.push(drawHint(hint[i]));
-    }
-    return hints;
-  }
+  // window.addEventListener("keyup", mancalaKeysHandler.onKeyPress);
 
-  function onResetButtonClick() {
+  // const onKeyPress = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  //   mancalaKeysHandler.onKeyPress(e);
+  // };
+
+  async function onResetButtonClick() {
     let newGame = new MancalaGame();
-    // setGame(newGame);
+    setGame(newGame);
     history.reset(newGame);
-  }
-
-  async function onSimulateButtonClick() {
-    // Vai por mim, melhor não kkkk
-    // let newGame = await executeGETRequest(`${Routes.BASE_URL}${Routes.API_URL.MANCALA}${Routes.ENDPOINTS.MANCALA.SIMULATE_GAME}`, {});
+    
   }
 
   function onZClick() {
-    console.log(a)
-    // setGame(history.back());
+    setGame(history.back());
   }
 
   function onFixClick() {
@@ -60,27 +60,26 @@ export default function MancalaTable() {
   }
 
   function onYClick() {
-    a.props.onYClick()
-    // setGame(
-    // history.forward());
+    setGame(history.forward());
+  }
+
+  async function onSimulateClick() {
+    await simulate(game).then((hints) => {
+      if (hints) {
+        setHints(hints)
+      }
+    });
   }
 
   return (
     <div>
-      <div className='hint-grid'>
-          {drawPlayer2Hints()}
-        </div>
-      {a}
-      <div className='hint-grid'>
-          {drawPlayer1Hints()}
-        </div>
+      <MancalaBoard game={game} setGame={setGame} history={history} hints={hints} mancalaKeysHandler={mancalaKeysHandler}/>
       <div className="buttons">
         <button onClick={onResetButtonClick}>Reset</button>
-        <button onClick={onSimulateButtonClick}>Simulate</button>
-
         <button onClick={onZClick}>Z</button>
         <button onClick={onFixClick}>Fix</button>
         <button onClick={onYClick}>Y</button>
+        <button onClick={onSimulateClick} disabled={game.getFrozenPebbles() < 33}>Matrix</button>
       </div>
     </div>
   );

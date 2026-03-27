@@ -1,0 +1,11 @@
+Forma para codificar:
+
+Quando um jogador faz uma jogada, os pits com menor chance de serem afetados são os do tabuleiro adversário,
+e mais próximos da mancala inimiga. Portanto, é interessante que esses pits sejam os de valor maior na codificação,
+pois assim é garantido que jogadas parecidas entrem na mesma pasta pai
+
+portanto, começar
+
+
+
+add first position, then shift 5 positions, add 2nd, shift 5, and so on

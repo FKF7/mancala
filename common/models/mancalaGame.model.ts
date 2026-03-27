@@ -103,5 +103,9 @@ export default class MancalaGame {
         }
     }
 
+    public getFrozenPebbles(): number {
+        return this.board[0][0] + this.board[1][0];
+    }
+
 
 }

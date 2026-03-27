@@ -10,8 +10,7 @@ function App() {
   return (
     <div>
       <MancalaTable></MancalaTable>
-      {/* <CJFBoard></CJFBoard>
-      <UserList></UserList> */}
+      {/* <CJFBoard></CJFBoard> */}
     </div>
   );
 }

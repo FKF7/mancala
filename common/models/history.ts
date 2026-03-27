@@ -1,8 +1,8 @@
 import MancalaGame from './mancalaGame.model.ts';
-import { MancalaTurn, Pit } from '../types.ts'
+import { Hint } from '../types.ts'
 
 export default class History {
-    private history: MancalaGame[];
+    private history: MancalaGame[] = []
     private index = 0;
 
     constructor(game: MancalaGame) {

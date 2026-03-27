@@ -1,16 +1,10 @@
 {
-  "name": "exampleapp",
+  "name": "mancala",
   "version": "1.0.0",
   "type": "module",
-  "main": "app.js",
   "scripts": {
-    "start": "node --loader ts-node/esm server/app.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "tsx server/app.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "common": "^0.2.5",
     "cors": "^2.8.5",
@@ -20,7 +14,7 @@
     "@types/cors": "^2.8.18",
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.30",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.8.3"
   }
 }

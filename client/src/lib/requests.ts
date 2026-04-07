@@ -1,7 +1,7 @@
-import MancalaGame from "../../../common/models/mancalaGame.model";
-import { Hint, MancalaTurn, Pit } from "../../../common/types";
+import MancalaGame from "../models/mancalaGame.model";
+import { Hint, MancalaTurn, Pit } from "../types/types.ts";
 import { executeGETRequest } from "../utils/requestExecutor";
-import Routes from "../../../common/routes";
+import Routes from "../utils/routes.ts";
 
 
 export async function getHintData(game: MancalaGame): Promise<Hint[]> {

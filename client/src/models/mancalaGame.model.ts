@@ -1,5 +1,5 @@
-import Constants from '../constants.ts';
-import { MancalaTurn, Pit } from '../types.ts'
+import Constants from '../utils/constants';
+import { MancalaTurn, Pit } from '../types/types'
 
 export default class MancalaGame {
     private board: number[][];

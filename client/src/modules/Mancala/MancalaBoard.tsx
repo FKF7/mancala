@@ -1,14 +1,12 @@
 import React, { useEffect, ReactElement, useState } from 'react';
-import MancalaGame from '../../../../common/models/mancalaGame.model.ts';
-import Constants from '../../../../common/constants.ts';
+import MancalaGame from '../../models/mancalaGame.model';
+import History from '../../models/history';
+import Constants from '../../utils/constants';
 import '../../App.css';
 import './MancalaBoard.css';
-import { MancalaTurn, Pit, Hint } from '../../../../common/types.ts';
-import { executeGETRequest } from '../../utils/requestExecutor.ts';
-import Routes from '../../../../common/routes';
-import History from '../../../../common/models/history.ts';
-import { getHintData, makeMove } from '../../lib/requests.ts';
-import MancalaKeyBinds from './MancalaKeyBinds.ts';
+import { MancalaTurn, Pit, Hint } from '../../types/types';
+import { makeMove } from '../../lib/requests';
+import MancalaKeyBinds from './MancalaKeyBinds';
 
 type MancalaBoardProps = {
   game: MancalaGame;

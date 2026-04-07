@@ -1,5 +1,5 @@
-import MancalaGame from './mancalaGame.model.ts';
-import { Hint } from '../types.ts'
+import MancalaGame from './mancalaGame.model';
+import { Hint } from '../types/types';
 
 export default class History {
     private history: MancalaGame[] = []

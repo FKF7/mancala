@@ -23,7 +23,7 @@ const HINT_UNKNOWN: EncodedHint = 0x40;     // 0100 0000
 const HINT_NORMAL: EncodedHint = 0x00;      // 0000 0000
 
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Hint {
     value: Pebbles,
@@ -48,6 +48,7 @@ impl Hint {
 
 pub type HintData = [Hint; 6];
 
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum ForwardReason {
     NoForward,
     NewBestHint,
@@ -78,6 +79,7 @@ impl MancalaStateFile {
         if path.exists() {
             return Self::read_file(state_code, Some(path));
         } else {
+            println!("Path {:?} was not found, dumbass", path);
             return Err(io::Error::new(io::ErrorKind::NotFound, "File not found"));
         }
     }
@@ -223,6 +225,17 @@ pub enum CodecErrorOrError {
 pub struct DataHandler;
 
 impl DataHandler {
+    pub fn fetch_path(mancala_game: MancalaGame) -> Result<PathBuf, CodecErrorOrError> {
+        let state_code = match MancalaGameCodec::encode(&mancala_game, None) {
+            Ok(code) => code,
+            Err(e) => return Err(CodecErrorOrError::CodecError(e))
+        };
+
+        let path = FilePathHandler::generate_path(state_code);
+
+        Ok(path)
+    }
+
     pub fn fetch_hint_data(mancala_game: MancalaGame) -> Result<HintData, CodecErrorOrError> {
         let mut hint_data: HintData = [Hint::new_empty(); 6];
         let current_turn = match mancala_game.get_current_turn() {
@@ -240,8 +253,6 @@ impl DataHandler {
             Err(e) => return Err(CodecErrorOrError::Error(e)),
         };
 
-        //println!("Fetching data from {:?}", game_state.path);
-
         for i in 0..NUM_PITS {
             let value = game_state.get_hint_value(i + 1) + current_mancala;
             let hint_type = game_state.get_hint_type(i + 1);
@@ -251,17 +262,25 @@ impl DataHandler {
         Ok(hint_data)
     }
 
-    pub fn simulate_until_moves(game: MancalaGame, ends_reached: i32) -> io::Result<i32> {
+    pub fn simulate_until_moves(game: MancalaGame, ends_reached: u32, max_ends: Option<u32>) -> io::Result<u32> {
         let mut ends_reached = ends_reached;
         if game.get_current_turn() == None {
-            return Ok(1);
+            return Ok(ends_reached + 1);
         }
+
         let hints = Self::fetch_hint_data(game).expect("Failed to retrieve hints");
+        if hints.iter().all(|hint| hint.hint_type == HINT_COMPLETED || hint.hint_type == HINT_INVALID) {
+            return Ok(ends_reached + 1);
+        }
         
         for i in 1..=NUM_PITS {
-            if ends_reached >= 50000000 {
-                println!("Ends Reached: {}", ends_reached);
-                // return Ok(ends_reached);
+            match max_ends {
+                Some(max) => {
+                    if (max == 0 && ends_reached >= DEFAULT_MAX_SIMULATION_ENDS) || ends_reached >= max {
+                        return Ok(ends_reached);
+                    };
+                },
+                _ => ()
             }
             if hints[i - 1].hint_type == HINT_COMPLETED || hints[i - 1].hint_type == HINT_INVALID { continue }
             let next_game = match game.clone().make_move(i) {
@@ -269,7 +288,7 @@ impl DataHandler {
                 Err(_) => { continue }
             };
             Self::save_data(next_game, game, i)?;
-            Self::simulate_until_moves(next_game, ends_reached)?;
+            ends_reached = Self::simulate_until_moves(next_game, ends_reached, max_ends)?;
         }
 
         Ok(ends_reached)
@@ -356,10 +375,14 @@ impl DataHandler {
         let base_endgame_mancala = base_current_mancala + current_state.get_best_hint_value();
 
         for parent_code in current_state.parents.clone() {
+            
 
             let mut parent_state = match MancalaStateFile::new_from_read_file(parent_code) {
                 Ok(state) => state,
-                Err(e) => return Err(e)
+                Err(e) => {
+                    println!("Was on this path {:?}", current_state.path);
+                    return Err(e)
+                }
             };
 
             let move_pit = MancalaGameCodec::get_move_from_code(parent_code).unwrap();
@@ -384,7 +407,7 @@ impl DataHandler {
                 ForwardReason::StateCompletion => {
                     match parent_state.get_hint_type(move_pit) {
                         HINT_UNKNOWN => pebbles_move | HINT_COMPLETED,
-                        HINT_NORMAL => parent_state.get_hint_value(move_pit) | HINT_COMPLETED,
+                        HINT_NORMAL => pebbles_move | HINT_COMPLETED,
                         HINT_COMPLETED => panic!("If the hint is already completed, it shouldn't be forwarding stuff"),
                         HINT_INVALID => panic!("It should be impossible to be here since this move is impossible"),
                         _ => panic!("Math doesn't make sense and the universe will explode")
@@ -450,10 +473,7 @@ impl DataHandler {
                 }
             };
 
-        // hints
         file.write_all(&file_content.hints)?;
-
-        // parents
         for parent in file_content.parents {
             file.write_all(&parent.to_be_bytes())?;
         }

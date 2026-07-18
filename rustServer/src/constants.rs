@@ -13,4 +13,4 @@ pub const BASE_DATA_DIR: &str = "data";
 pub const DATA_FILE_EXT: &str = "bin";
 pub const BITS_PER_PIT: u8 = 5;
 pub const TOTAL_CODE_BITS: u8 = 60;
-pub const MAX_SIMULATION_MOVES: i32 = 100;
+pub const DEFAULT_MAX_SIMULATION_ENDS: u32 = 10000;

@@ -4,3 +4,7 @@ export type Hint = {
     value: number;
     hintType: number
 }
+export type SimulationResult = {
+    hints: Hint[];
+    ends:   number;
+}

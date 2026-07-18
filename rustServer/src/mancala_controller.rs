@@ -1,6 +1,6 @@
 use crate::mancala_game_model::{MancalaGame};
 use crate::types::Pit;
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use axum::{extract::Query, Json};
 // use crate::mancala_game_data_handler::MancalaStateFile;
 // use crate Constants;
@@ -15,6 +15,18 @@ pub struct MoveQuery {
 #[derive(Deserialize)]
 pub struct BoardQuery {
     game: String
+}
+
+#[derive(Deserialize)]
+pub struct SimulationQuery {
+    game: String,
+    ends: Option<u32>
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct SimulationResponse {
+    hints: HintData,
+    ends: u32,
 }
 
 pub async fn handle_make_move_request(Query(q): Query<MoveQuery>) -> Json<MancalaGame> {
@@ -35,12 +47,23 @@ pub async fn handle_get_hint_data_request(Query(q): Query<BoardQuery>) -> Json<H
     Json(hint_data)
 }
 
-pub async fn handle_simulate_request(Query(q): Query<BoardQuery>) -> Json<HintData> {
+pub async fn handle_simulate_request(Query(q): Query<SimulationQuery>) -> Json<SimulationResponse> {
     // simulate all or maybe add a limit possible outcomes from a certain point, and return the updated hints obtained after that
     let game: MancalaGame = serde_json::from_str(&q.game).expect("invalid game JSON");
+    let max_ends: Option<u32> = q.ends;
     
-    DataHandler::simulate_until_moves(game, 0).expect("Something went wrong while simulating");
-    let hint_data = DataHandler::fetch_hint_data(game).expect("Failed to retrieve hints");
+    let ends = DataHandler::simulate_until_moves(game, 0, max_ends).expect("Something went wrong while simulating");
+    let hints = DataHandler::fetch_hint_data(game).expect("Failed to retrieve hints");
 
-    Json(hint_data)
+    println!("Simulated until {} ends", ends);
+    Json(SimulationResponse { hints, ends })
+}
+
+pub async fn handle_print_path_request(Query(q): Query<BoardQuery>) -> Json<()> {
+    let game: MancalaGame = serde_json::from_str(&q.game).expect("invalid game JSON");
+
+    let path = DataHandler::fetch_path(game).expect("Failed to retrieve path");
+    println!("{:?}", path);
+
+    Json(())
 }

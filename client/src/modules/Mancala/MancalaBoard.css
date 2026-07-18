@@ -1,4 +1,10 @@
 /* Basic styles for the Mancala board layout */
+.board-disabled {
+  pointer-events: none;
+  filter: grayscale(40%) brightness(100%);
+  opacity: 0.85;
+}
+
 .board-container {
   display: flex;
   flex-direction: column;

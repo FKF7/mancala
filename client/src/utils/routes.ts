@@ -20,6 +20,7 @@ const Routes = Object.freeze({
             GET_HINT_DATA: '/get_hint_data',
             SAVE_NEW_BOARD: '/save_new_board',
             SIMULATE_GAME: '/simulate',
+            PRINT_PATH: '/print_path',
         },
     }
 });

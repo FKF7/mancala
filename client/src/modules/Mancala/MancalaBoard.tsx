@@ -13,11 +13,11 @@ type MancalaBoardProps = {
   setGame: React.Dispatch<React.SetStateAction<MancalaGame>>;
   history: History;
   hints: Hint[];
+  isSimulating: boolean;
   mancalaKeysHandler: MancalaKeyBinds;
 }
 
-export default function MancalaBoard({ game, setGame, history, hints, mancalaKeysHandler }: MancalaBoardProps) {
-  const hintsShouldBeShown = true;
+export default function MancalaBoard({ game, setGame, history, hints, isSimulating, mancalaKeysHandler }: MancalaBoardProps) {
 
   useEffect(() => {
     mancalaKeysHandler.setAction("movePit", onPitClick);
@@ -61,50 +61,48 @@ export default function MancalaBoard({ game, setGame, history, hints, mancalaKey
     return pits;
   }
 
-  function drawHint(hint: Hint, player: MancalaTurn) {
-    if (!hintsShouldBeShown) {
-      return (
-        <div className='hint disabled'>
-          <img className="pit-icon" src="../../dist/hiddenIcon.png" alt="Hidden" />
-        </div>
-      );
-    }
-
+  function drawHint(hint: Hint, player: MancalaTurn, hintIndex: number) {
     if (game.getCurrentTurn() !== player) {
       return (
-        <div className='hint disabled'>
-          <img className="pit-icon" src="../../dist/forbiddenIcon.png" alt="Forbidden" />
+        <div key={`hint-${player}-${hintIndex}`} className='hint disabled'>
+          <img className="pit-icon" src={Constants.MANCALA.IMG.FORBIDDEN_ICON} alt="Forbidden" />
         </div>
       )
     }
 
     switch (hint?.hintType) {
+      case Constants.MANCALA.HINT_TYPE.HIDDEN:
+        return (
+        <div className='hint disabled'>
+          <img className="pit-icon" src={Constants.MANCALA.IMG.HIDDEN_ICON} alt="Hidden" />
+        </div>
+      );
       case Constants.MANCALA.HINT_TYPE.NORMAL:
         return (
-          <div className='hint'>
+          <div key={`hint-${player}-${hintIndex}`} className='hint'>
             {hint.value}
           </div>
         );
       case Constants.MANCALA.HINT_TYPE.UNKNOWN:
         return (
-          <div className='hint unknown'>
+          <div key={`hint-${player}-${hintIndex}`} className='hint unknown'>
             ?
           </div>
         );
       case Constants.MANCALA.HINT_TYPE.COMPLETED:
         return (
-          <div className='hint completed'>
+          <div key={`hint-${player}-${hintIndex}`} className='hint completed'>
             {hint.value}
           </div>
         );
       case Constants.MANCALA.HINT_TYPE.INVALID:
         return (
-          <div className='hint disabled'>
-            <img className="pit-icon" src="../../dist/forbiddenIcon.png" alt="Forbidden" />
+          <div key={`hint-${player}-${hintIndex}`} className='hint disabled'>
+            <img className="pit-icon" src={Constants.MANCALA.IMG.FORBIDDEN_ICON} alt="Forbidden" />
           </div>
         );
       default:
-        return <div className='hint weird'>
+        return <div key={`hint-${player}-${hintIndex}`} className='hint weird'>
           ??
         </div>
     }
@@ -113,7 +111,7 @@ export default function MancalaBoard({ game, setGame, history, hints, mancalaKey
   function drawPlayer1Hints() {
     const hintElements: ReactElement[] = []
     for (let i = 5; i >= 0; i--) {
-      hintElements.push(drawHint(hints[i], Constants.PLAYERS.PLAYER1 as MancalaTurn));
+      hintElements.push(drawHint(hints[i], Constants.PLAYERS.PLAYER1 as MancalaTurn, i));
     }
     return hintElements;
   }
@@ -121,13 +119,13 @@ export default function MancalaBoard({ game, setGame, history, hints, mancalaKey
   function drawPlayer2Hints() {
     const hintElements: ReactElement[] = []
     for (let i = 0; i < 6; i++) {
-      hintElements.push(drawHint(hints[i], Constants.PLAYERS.PLAYER2 as MancalaTurn));
+      hintElements.push(drawHint(hints[i], Constants.PLAYERS.PLAYER2 as MancalaTurn, i));
     }
     return hintElements;
   }
 
   return (
-    <div className="board-container">
+    <div className={`board-container ${isSimulating ? 'board-disabled' : ''}`}>
       <div className='hint-grid'>
         {drawPlayer2Hints()}
       </div>

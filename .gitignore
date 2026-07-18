@@ -5,3 +5,4 @@
 /rustServer/rustServer
 /.vscode
 /rustServer/data/*
+/rustServer/.vscode

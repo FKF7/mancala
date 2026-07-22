@@ -4,5 +4,5 @@
 /rustServer/target
 /rustServer/rustServer
 /.vscode
-/rustServer/data/*
+/rustServer/data/
 /rustServer/.vscode

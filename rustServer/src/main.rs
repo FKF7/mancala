@@ -1,3 +1,4 @@
+mod api_doc;
 mod mancala_controller;
 mod routes;
 mod error;

@@ -3,7 +3,7 @@ use crate::constants::{PLAYER1, PLAYER2, NUM_PITS, NUM_PEBBLES, FULL_CYCLE, MANC
 use crate::types::{MancalaBoard, MancalaTurn, Pit, Pebbles};
 use crate::error::MoveError;
 use std::fmt;
-use std::io;
+use utoipa::ToSchema;
 
 enum Outcome {
     Normal,
@@ -11,10 +11,12 @@ enum Outcome {
     Capture
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Copy, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MancalaGame {
+    #[schema(value_type = Vec<Vec<u8>>)]
     board: MancalaBoard,
+    
     current_turn: MancalaTurn
 }
 

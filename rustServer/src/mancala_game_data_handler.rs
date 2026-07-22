@@ -2,10 +2,12 @@ use crate::constants::*;
 use crate::mancala_game_codec::{MancalaGameCodec};
 use crate::types::*;
 use crate::mancala_game_model::MancalaGame;
-use crate::error::{CodecError, MoveError};
+use crate::error::{CodecError};
+use serde::{Serialize, Deserialize};
 use std::io::{self, Read, Write, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::fs::{OpenOptions};
+use utoipa::ToSchema;
 
 pub struct MancalaStateFile {
     code: EncodedGameState,
@@ -22,8 +24,7 @@ const HINT_INVALID: EncodedHint = 0xC0;     // 1100 0000
 const HINT_UNKNOWN: EncodedHint = 0x40;     // 0100 0000
 const HINT_NORMAL: EncodedHint = 0x00;      // 0000 0000
 
-
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Hint {
     value: Pebbles,
@@ -48,7 +49,7 @@ impl Hint {
 
 pub type HintData = [Hint; 6];
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum ForwardReason {
     NoForward,
     NewBestHint,

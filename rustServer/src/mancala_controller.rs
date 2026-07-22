@@ -1,11 +1,11 @@
 use crate::mancala_game_model::{MancalaGame};
-use crate::types::Pit;
+use crate::types::{EncodedGameState, MancalaTurn, Pebbles, Pit};
 use serde::{Serialize, Deserialize};
 use utoipa::{IntoParams, ToSchema};
 use axum::{extract::Query, Json};
 // use crate::mancala_game_data_handler::MancalaStateFile;
-// use crate Constants;
 use crate::mancala_game_data_handler::{DataHandler, Hint, HintData};
+use crate::mancala_game_codec::MancalaGameCodec;
 
 #[derive(Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -35,6 +35,22 @@ pub struct SimulationQuery {
     /// If zero, uses default value
     /// If None, simulates with no limit
     ends: Option<u32>
+}
+
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct DecodeQuery {
+    /// string representing a 64-bit hex code of the game state
+    code: String,
+
+    /// Current player's turn (0 or 1)
+    current_turn: MancalaTurn,
+
+    /// Number of pebbles in player 1's mancala
+    current_mancala: Pebbles,
+
+    /// Number of pebbles in player 2's mancala
+    opponent_mancala: Pebbles,
 }
 
 #[derive(Serialize, Debug, Clone, ToSchema)]
@@ -163,4 +179,31 @@ pub async fn handle_print_path_request(Query(q): Query<BoardQuery>) -> Json<()> 
     println!("{:?}", path);
 
     Json(())
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/mancala/decode_code",
+    params(DecodeQuery),
+    responses(
+        (
+            status = 200,
+            description = "Code decoded successfully",
+            body = MancalaGame
+        ),
+        (
+            status = 400,
+            description = "Invalid code or game state"
+        )
+    ),
+    tag = "Debug"
+)]
+pub async fn handle_decode_code_request(Query(q): Query<DecodeQuery>) -> Json<MancalaGame> {
+    let code: EncodedGameState = u64::from_str_radix(&q.code, 16).expect("Invalid hex code");
+    let current_turn = q.current_turn;
+    let current_mancala = q.current_mancala;
+    let opponent_mancala = q.opponent_mancala;
+
+    let game = MancalaGameCodec::decode(code, current_turn, current_mancala, opponent_mancala).expect("Failed to decode game");
+    Json(game)
 }

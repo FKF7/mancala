@@ -44,32 +44,44 @@ impl MancalaGameCodec {
         Ok(code)
     }
 
-    // pub fn decode(code: EncodedGameState, current_turn: MancalaTurn) -> Result<MancalaGame, CodecError> {
-    //     let mut code: EncodedGameState = code;
+    pub fn decode(code: EncodedGameState, current_turn: MancalaTurn, current_mancala: Pebbles, opponent_mancala: Pebbles) -> Result<MancalaGame, CodecError> {
+        let mut code: EncodedGameState = code;
 
-    //     if current_turn == None {
-    //         return Err(CodecError::GameEnded);
-    //     }
+        if current_turn == None {
+            return Err(CodecError::InvalidTurn)
+        }
 
-    //     let mut board: MancalaBoard = [[0u8; 7]; 2];
+        let mut board: MancalaBoard = [[0u8; 7]; 2];
 
-    //     let players = match current_turn {
-    //         Some(PLAYER1) => [PLAYER1, PLAYER2],
-    //         Some(PLAYER2) => [PLAYER2, PLAYER1],
-    //         None => return Err(CodecError::GameEnded),
-    //         _ => return Err(CodecError::InvalidTurn),
-    //     };
+        let players = match current_turn {
+            Some(PLAYER1) => [PLAYER1, PLAYER2],
+            Some(PLAYER2) => [PLAYER2, PLAYER1],
+            _ => return Err(CodecError::InvalidTurn),
+        };
 
-    //     for board_side in players {
-    //         for pit in (1..=6).rev() {
+        for board_side in players {
+            for pit in (1..=6).rev() {
                 
-    //             let pebbles = (code & LAST_5_BITS_MASK) as u8;
-    //             board[board_side][pit] = pebbles;
-    //             code >>= 5;
-    //         }
-    //     }
-    //     Ok(MancalaGame::new_from_game(board, current_turn))
-    // }
+                let pebbles = (code & LAST_5_BITS_MASK) as u8;
+                board[board_side][pit] = pebbles;
+                code >>= 5;
+            }
+        }
+
+        match current_turn {
+            Some(PLAYER1) => {
+                board[PLAYER1][MANCALA_PIT] = current_mancala;
+                board[PLAYER2][MANCALA_PIT] = opponent_mancala;
+            },
+            Some(PLAYER2) => {
+                board[PLAYER1][MANCALA_PIT] = opponent_mancala;
+                board[PLAYER2][MANCALA_PIT] = current_mancala;
+            },
+            _ => {}
+        }
+        
+        Ok(MancalaGame::new_from_game(board, current_turn))
+    }
 
     pub fn get_move_from_code(code: EncodedGameState) -> Option<Pit> {
         let move_pit = ((code & FIRST_4_BITS_MASK) >> TOTAL_CODE_BITS) as Pit;
@@ -190,85 +202,100 @@ mod encode_tests {
     }
 }
 
-// #[cfg(test)]
-// mod decode_tests {
-//     use super::*;
+#[cfg(test)]
+mod decode_tests {
+    use super::*;
 
-//     #[test]
-//     fn new_board() {
-//         let original_code: EncodedGameState = 0x0210842108421084;
-//         let expected_game = MancalaGame::new_from_game(
-//             [
-//                 [0, 4, 4, 4, 4, 4, 4],
-//                 [0, 4, 4, 4, 4, 4, 4],
-//             ],
-//             Some(PLAYER1)
-//         );
+    #[test]
+    fn new_board() {
+        let original_code: EncodedGameState = 0x0210842108421084;
+        let current_turn: MancalaTurn = Some(PLAYER1);
+        let current_mancala: Pebbles = 0;
+        let opponent_mancala: Pebbles = 0;
+        let expected_game = MancalaGame::new_from_game(
+            [
+                [0, 4, 4, 4, 4, 4, 4],
+                [0, 4, 4, 4, 4, 4, 4],
+            ],
+            Some(PLAYER1)
+        );
 
-//         let decoded_game = MancalaGameCodec::decode(original_code, Some(PLAYER1)).unwrap();
-//         assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
-//     }
+        let decoded_game = MancalaGameCodec::decode(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
+        assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
+    }
 
-//     #[test]
-//     fn move_1() {
-//         let original_code: EncodedGameState = 0x021084210A528084;
-//         let expected_game = MancalaGame::new_from_game(
-//             [
-//                 [1, 5, 5, 5, 0, 4, 4],
-//                 [0, 4, 4, 4, 4, 4, 4],
-//             ],
-//             Some(PLAYER1)
-//         );
+    #[test]
+    fn move_1() {
+        let original_code: EncodedGameState = 0x021084210A528084;
+        let current_turn: MancalaTurn = Some(PLAYER1);
+        let current_mancala: Pebbles = 1;
+        let opponent_mancala: Pebbles = 0;
+        let expected_game = MancalaGame::new_from_game(
+            [
+                [1, 5, 5, 5, 0, 4, 4],
+                [0, 4, 4, 4, 4, 4, 4],
+            ],
+            Some(PLAYER1)
+        );
 
-//         let decoded_game = MancalaGameCodec::decode(original_code, Some(PLAYER1)).unwrap();
-//         assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
-//     }
+        let decoded_game = MancalaGameCodec::decode(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
+        assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
+    }
 
-//     #[test]
-//     fn move_2() {
-//         let original_code: EncodedGameState = 0x0014A021084294A5;
-//         let expected_game = MancalaGame::new_from_game(
-//             [
-//                 [2, 0, 5, 5, 0, 4, 4],
-//                 [0, 4, 4, 5, 5, 5, 5],
-//             ],
-//             Some(PLAYER2)
-//         );
+    #[test]
+    fn move_2() {
+        let original_code: EncodedGameState = 0x0014A021084294A5;
+        let current_turn: MancalaTurn = Some(PLAYER2);
+        let current_mancala: Pebbles = 0;
+        let opponent_mancala: Pebbles = 2;
+        let expected_game = MancalaGame::new_from_game(
+            [
+                [2, 0, 5, 5, 0, 4, 4],
+                [0, 4, 4, 5, 5, 5, 5],
+            ],
+            Some(PLAYER2)
+        );
         
-//         let decoded_game = MancalaGameCodec::decode(original_code, Some(PLAYER2)).unwrap();
-//         assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
-//     }
+        let decoded_game = MancalaGameCodec::decode(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
+        assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
+    }
 
-//     #[test]
-//     fn some_board1() {
-//         let original_code: EncodedGameState = 0x0504203800148081;
-//         let expected_game = MancalaGame::new_from_game(
-//             [
-//                 [0, 0, 1, 9, 0, 4, 1],
-//                 [0, 10, 1, 1, 0, 7, 0],
-//             ],
-//             Some(PLAYER1)
-//         );
+    #[test]
+    fn some_board1() {
+        let original_code: EncodedGameState = 0x0504203800148081;
+        let current_turn: MancalaTurn = Some(PLAYER1);
+        let current_mancala: Pebbles = 10;
+        let opponent_mancala: Pebbles = 4;
+        let expected_game = MancalaGame::new_from_game(
+            [
+                [10, 0, 1, 9, 0, 4, 1],
+                [4, 10, 1, 1, 0, 7, 0],
+            ],
+            Some(PLAYER1)
+        );
 
-//         let decoded_game = MancalaGameCodec::decode(original_code, Some(PLAYER1)).unwrap();
-//         assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
-//     }
+        let decoded_game = MancalaGameCodec::decode(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
+        assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
+    }
 
-//     #[test]
-//     fn some_board2() {
-//         let original_code: EncodedGameState = 0x000020105C100401;
-//         let expected_game = MancalaGame::new_from_game(
-//             [
-//                 [0, 0, 0, 1, 0, 2, 1],
-//                 [0, 14, 1, 0, 1, 0, 1],
-//             ],
-//             Some(PLAYER2)
-//         );
+    #[test]
+    fn some_board2() {
+        let original_code: EncodedGameState = 0x000020105C100401;
+        let current_turn: MancalaTurn = Some(PLAYER2);
+        let current_mancala: Pebbles = 9;
+        let opponent_mancala: Pebbles = 18;
+        let expected_game = MancalaGame::new_from_game(
+            [
+                [18, 0, 0, 1, 0, 2, 1],
+                [9, 14, 1, 0, 1, 0, 1],
+            ],
+            Some(PLAYER2)
+        );
 
-//         let decoded_game = MancalaGameCodec::decode(original_code, Some(PLAYER2)).unwrap();
-//         assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
-//     }
-// }
+        let decoded_game = MancalaGameCodec::decode(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
+        assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
+    }
+}
 
 #[cfg(test)]
 mod get_move_from_code_tests {

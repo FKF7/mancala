@@ -1,1 +1,1 @@
-export * from './mancala.types'
+export * from "./mancala.types";

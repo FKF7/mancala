@@ -1,4 +1,4 @@
 export enum SimulationResultStatus {
-    ERROR = 0,
-    SUCCESS = 1
+  ERROR = 0,
+  SUCCESS = 1,
 }

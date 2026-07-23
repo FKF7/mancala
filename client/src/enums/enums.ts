@@ -1,1 +1,1 @@
-export * from './mancala.enums';
+export * from "./mancala.enums";

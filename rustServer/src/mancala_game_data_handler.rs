@@ -368,7 +368,6 @@ impl DataHandler {
         } else {
             Self::forward_data_recursion(
                 current_state,
-                current_mancala,
                 ForwardReason::NewBestHint
             )?;
         }
@@ -396,15 +395,13 @@ impl DataHandler {
         
         parent_state.save_updated_hint(move_pit, new_hint)?;
 
-        Self::forward_data_recursion(parent_state, parent_mancala, ForwardReason::NewBestHint)
+        Self::forward_data_recursion(parent_state, ForwardReason::NewBestHint)
     }
 
-    fn forward_data_recursion(current_state: MancalaStateFile, base_current_mancala: Pebbles, reason: ForwardReason) -> io::Result<()> {
-        let base_endgame_mancala = base_current_mancala + current_state.get_best_hint_value();
+    fn forward_data_recursion(current_state: MancalaStateFile, reason: ForwardReason) -> io::Result<()> {
+        let base_current_best_hint_value = current_state.get_best_hint_value();
 
         for parent_code in current_state.parents.clone() {
-            
-
             let mut parent_state = match MancalaStateFile::new_from_read_file(parent_code) {
                 Ok(state) => state,
                 Err(e) => {
@@ -423,12 +420,8 @@ impl DataHandler {
             let parent_pebbles = MancalaGameCodec::get_pebbles_on_code(parent_code);
             let free_turn_ind = Self::get_free_turn_ind(parent_code);
 
-            let current_mancala = Self::swap_mancala_value_if_needed(base_current_mancala, free_turn_ind, current_pebbles);
-            let endgame_mancala = Self::swap_mancala_value_if_needed(base_endgame_mancala, free_turn_ind, 0);
-            let parent_mancala = current_mancala - (parent_pebbles - current_pebbles);
-
-            let pebbles_move = endgame_mancala - parent_mancala;
-
+            let current_best_hint_value = Self::swap_hint_value_if_needed(current_pebbles, free_turn_ind, base_current_best_hint_value);
+            let pebbles_move = current_best_hint_value + parent_pebbles - current_pebbles;
 
             let new_hint: EncodedHint = match reason {
                 ForwardReason::NoForward => panic!("Help"),
@@ -462,17 +455,17 @@ impl DataHandler {
 
             match should_forward {
                 ForwardReason::NoForward => (),
-                _ => Self::forward_data_recursion(parent_state, parent_mancala, should_forward)?
+                _ => Self::forward_data_recursion(parent_state, should_forward)?
             }
         }
 
         Ok(())
     }
 
-    fn swap_mancala_value_if_needed(mancala_value: Pebbles, free_turn_ind: bool, board_pebbles: Pebbles) -> Pebbles {
+    fn swap_hint_value_if_needed(board_pebbles: Pebbles, free_turn_ind: bool, hint_value: Pebbles) -> Pebbles {
         match free_turn_ind {
-            true => mancala_value,
-            false => TOTAL_PEBBLES - (mancala_value + board_pebbles),
+            true => hint_value,
+            false => board_pebbles - hint_value,
         }
     }
 

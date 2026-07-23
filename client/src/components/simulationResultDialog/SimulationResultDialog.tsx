@@ -22,7 +22,11 @@ export default function SimulationResultDialog({
         className={`simulation-dialog simulation-dialog-${status === SimulationResultStatus.SUCCESS ? "success" : "error"}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2>{status === SimulationResultStatus.SUCCESS ? "Simulation completed" : "Simulation error"}</h2>
+        <h2>
+          {status === SimulationResultStatus.SUCCESS
+            ? "Simulation completed"
+            : "Simulation error"}
+        </h2>
 
         <p>{message}</p>
 

@@ -1,8 +1,7 @@
-/target
-/node_modules
-/client/node_modules
-/rustServer/target
-/rustServer/rustServer
+client/node_modules
+rustServer/target
+rustServer/rustServer
 /.vscode
-/rustServer/data/
-/rustServer/.vscode
+
+rustServer/data/
+rustServer/.vscode

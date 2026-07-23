@@ -6,7 +6,8 @@ use crate::error::{CodecError};
 use serde::{Serialize, Deserialize};
 use std::io::{self, Read, Write, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::fs::{OpenOptions};
+use std::fs::OpenOptions;
+use std::collections::VecDeque;
 use utoipa::ToSchema;
 
 pub struct MancalaStateFile {
@@ -235,6 +236,32 @@ impl DataHandler {
         let path = FilePathHandler::generate_path(state_code);
 
         Ok(path)
+    }
+
+    pub fn fetch_sequence(state_code: EncodedGameState) -> Result<String, CodecErrorOrError> {
+        let mut sequence = VecDeque::<String>::with_capacity(200); // will have 1 char per move, plus a newline for each non-free-turn move
+        let mut current_code = state_code;
+
+        while current_code != EMPTY_BOARD_CODE {
+            let move_pit = MancalaGameCodec::get_move_from_code(current_code);
+            
+            if !MancalaGameCodec::check_free_turn_on_code(current_code, move_pit) {
+                sequence.push_front("\n".to_string());
+            }
+            sequence.push_front(move_pit.unwrap().to_string());
+
+            let state_file = match MancalaStateFile::new_from_read_file(current_code) {
+                Ok(state) => state,
+                Err(e) => return Err(CodecErrorOrError::Error(e)),
+            };
+
+            if state_file.parents.is_empty() {
+                break;
+            }
+            current_code = state_file.parents[0];
+        }
+
+        Ok(sequence.into_iter().collect())
     }
 
     pub fn fetch_hint_data(mancala_game: MancalaGame) -> Result<HintData, CodecErrorOrError> {

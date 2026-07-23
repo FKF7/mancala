@@ -10,6 +10,7 @@ use crate::mancala_controller::{
     handle_get_hint_data_request,
     handle_simulate_request,
     handle_print_path_request,
+    handle_print_sequence_request,
     handle_decode_code_request
 };
 
@@ -24,6 +25,7 @@ pub fn build_router() -> Router {
         .route("/api/mancala/get_hint_data", get(handle_get_hint_data_request))
         .route("/api/mancala/simulate", get(handle_simulate_request))
         .route("/api/mancala/print_path", get(handle_print_path_request))
+        .route("/api/mancala/print_sequence", get(handle_print_sequence_request))
         .route("/api/mancala/decode_code", get(handle_decode_code_request))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(cors)

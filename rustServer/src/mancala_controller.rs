@@ -39,6 +39,13 @@ pub struct SimulationQuery {
 
 #[derive(Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
+pub struct PrintSequenceQuery {
+    /// string representing a 64-bit hex code of the game state
+    code: String,
+}
+
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct DecodeQuery {
     /// string representing a 64-bit hex code of the game state
     code: String,
@@ -177,6 +184,35 @@ pub async fn handle_print_path_request(Query(q): Query<BoardQuery>) -> Json<()> 
 
     let path = DataHandler::fetch_path(game).expect("Failed to retrieve path");
     println!("{:?}", path);
+
+    Json(())
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/mancala/print_sequence",
+    params(PrintSequenceQuery),
+    responses(
+        (
+            status = 200,
+            description = "Sequence printed successfully"
+        ),
+        (
+            status = 400,
+            description = "Invalid game state"
+        ),
+        (
+            status = 500,
+            description = "Unable to determine sequence"
+        )
+    ),
+    tag = "Debug"
+)]
+pub async fn handle_print_sequence_request(Query(q): Query<PrintSequenceQuery>) -> Json<()> {
+    let code: EncodedGameState = u64::from_str_radix(&q.code, 16).expect("Invalid hex code");
+
+    let sequence = DataHandler::fetch_sequence(code).expect("Failed to retrieve sequence");
+    println!("{}", sequence);
 
     Json(())
 }

@@ -16,6 +16,7 @@ use crate::mancala_game_model::MancalaGame;
         crate::mancala_controller::handle_get_hint_data_request,
         crate::mancala_controller::handle_simulate_request,
         crate::mancala_controller::handle_print_path_request,
+        crate::mancala_controller::handle_print_sequence_request,
         crate::mancala_controller::handle_decode_code_request
     ),
     components(

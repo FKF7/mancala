@@ -1,7 +1,9 @@
-client/node_modules
-rustServer/target
-rustServer/rustServer
 /.vscode
 
+client/node_modules
+client/dist
+
+rustServer/target
+rustServer/rustServer
 rustServer/data/
 rustServer/.vscode

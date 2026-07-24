@@ -1,4 +1,4 @@
-import React, { useEffect, ReactElement, useState } from "react";
+import React, { useEffect, ReactElement, useRef } from "react";
 import MancalaGame from "../../models/mancalaGame.model";
 import History from "../../models/history";
 import Constants from "../../utils/constants";
@@ -25,18 +25,31 @@ export default function MancalaBoard({
   isSimulating,
   mancalaKeysHandler,
 }: MancalaBoardProps) {
+  const isMovingRef = useRef(false);
   useEffect(() => {
     mancalaKeysHandler.setAction("movePit", onPitClick);
-  }, [game]);
+  }, [mancalaKeysHandler, onPitClick]);
 
-  async function onPitClick(pit: Pit) {
+  async function onPitClick(pit: Pit): Promise<void> {
+    if (isMovingRef.current || isSimulating) {
+      return;
+    }
+
     if (game.getCurrentBoardPit(pit) === 0) {
       return;
     }
-    let newGame = await makeMove(game, pit);
-    if (newGame) {
-      setGame(newGame);
-      history.add(newGame);
+
+    isMovingRef.current = true;
+
+    try {
+      const newGame = await makeMove(game, pit);
+
+      if (newGame) {
+        setGame(newGame);
+        history.add(newGame);
+      }
+    } finally {
+      isMovingRef.current = false;
     }
   }
 

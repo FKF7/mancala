@@ -21,7 +21,25 @@ export default function MancalaTable() {
   let [isMute, setIsMute] = useState(false);
   let [isSimulating, setIsSimulating] = useState(false);
   let [interruptSim, setInterruptSim] = useState(false);
+  const mancalaKeysHandlerRef = useRef<MancalaKeyBinds | null>(null);
   const interruptSimRef = useRef(false);
+
+  if (mancalaKeysHandlerRef.current === null) {
+    mancalaKeysHandlerRef.current = new MancalaKeyBinds();
+  }
+  const mancalaKeysHandler = mancalaKeysHandlerRef.current;
+
+  useEffect(() => {
+    mancalaKeysHandler.setAction("undo", onZClick);
+    mancalaKeysHandler.setAction("redo", onYClick);
+    mancalaKeysHandler.setAction("reset", onResetButtonClick);
+
+    mancalaKeysHandler.start();
+
+    return () => {
+      mancalaKeysHandler.stop();
+    };
+  }, [mancalaKeysHandler]);
 
   const requestInterrupt = () => {
     interruptSimRef.current = true;
@@ -59,20 +77,6 @@ export default function MancalaTable() {
     status: SimulationResultStatus.SUCCESS,
     message: "",
   });
-
-  const mancalaKeysHandler = new MancalaKeyBinds();
-
-  useEffect(() => {
-    mancalaKeysHandler.setAction("undo", onZClick);
-    mancalaKeysHandler.setAction("redo", onYClick);
-    mancalaKeysHandler.setAction("reset", onResetButtonClick);
-  }, []);
-
-  // window.addEventListener("keyup", mancalaKeysHandler.onKeyPress);
-
-  // const onKeyPress = (e: React.KeyboardEvent<HTMLDivElement>) => {
-  //   mancalaKeysHandler.onKeyPress(e);
-  // };
 
   async function onResetButtonClick() {
     let newGame = new MancalaGame();

@@ -8,51 +8,74 @@ type MancalaActions = {
 };
 
 export default class MancalaKeyBinds {
-  private actions: MancalaActions;
+  private actions: MancalaActions = {
+    undo: () => {},
+    redo: () => {},
+    reset: () => {},
+    movePit: async () => {},
+  };
 
-  constructor() {
-    this.actions = {
-      undo: () => {},
-      redo: () => {},
-      reset: () => {},
-      movePit: async (pit: number) => {},
-    };
-    window.addEventListener("keyup", this.onKeyPress.bind(this));
-  }
+  private isListening = false;
+
+  private readonly keyUpHandler = (event: KeyboardEvent): void => {
+    this.onKeyPress(event);
+  };
 
   public setAction<K extends keyof MancalaActions>(
     actionKey: K,
     action: MancalaActions[K],
-  ) {
+  ): void {
     this.actions[actionKey] = action;
   }
 
-  public onKeyPress(e: KeyboardEvent | React.KeyboardEvent) {
-    // debugger;
-    console.log(e.key);
-    console.log(this.actions);
-    return;
+  public start(): void {
+    if (this.isListening) {
+      return;
+    }
 
-    switch (e.key) {
+    window.addEventListener("keyup", this.keyUpHandler);
+    this.isListening = true;
+  }
+
+  public stop(): void {
+    if (!this.isListening) {
+      return;
+    }
+
+    window.removeEventListener("keyup", this.keyUpHandler);
+    this.isListening = false;
+  }
+
+  private onKeyPress(event: KeyboardEvent): void {
+    const target = event.target;
+
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement
+    ) {
+      return;
+    }
+
+    switch (event.key.toLowerCase()) {
       case "z":
-      case "Z":
+      case "arrowleft":
+      case "backspace":
         this.actions.undo();
         break;
 
       case "y":
-      case "Y":
+      case "arrowright":
         this.actions.redo();
         break;
 
       case "r":
-      case "R":
         this.actions.reset();
         break;
 
       default:
-        if (e.key >= "1" && e.key <= "6") {
-          console.log(`Moving pit ${e.key}`);
-          this.actions.movePit(Number(e.key) as Pit);
+        if (/^[1-6]$/.test(event.key)) {
+          void this.actions.movePit(Number(event.key) as Pit);
         }
     }
   }

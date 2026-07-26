@@ -1,3 +1,5 @@
+use std::print;
+
 use crate::mancala_game_model::{MancalaGame};
 use crate::types::{EncodedGameState, MancalaTurn, Pebbles, Pit};
 use serde::{Serialize, Deserialize};
@@ -14,22 +16,21 @@ pub struct MoveQuery {
     pit: Pit,
 
     /// MancalaGame in json format
-    game: String
+    game: MancalaGame
 }
 
 #[derive(Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct BoardQuery {
     /// MancalaGame in json format
-    game: String
+    game: MancalaGame
 }
 
 #[derive(Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct SimulationQuery {
     /// MancalaGame in json format
-    game: String,
-
+    game: MancalaGame,
 
     /// Optional maximum number of ends to simulate
     /// If zero, uses default value
@@ -71,7 +72,7 @@ pub struct SimulationResponse {
 }
 
 #[utoipa::path(
-    get,
+    post,
     path = "/api/mancala/make_move",
     params(MoveQuery),
     responses(
@@ -87,9 +88,10 @@ pub struct SimulationResponse {
     ),
     tag = "Game"
 )]
-pub async fn handle_make_move_request(Query(q): Query<MoveQuery>) -> Json<MancalaGame> {
-    let game: MancalaGame = serde_json::from_str(&q.game).expect("invalid game JSON");
-    let pit: Pit = q.pit;
+pub async fn handle_make_move_request(Json(payload): Json<MoveQuery>) -> Json<MancalaGame> {
+    let game = payload.game;
+    // let game: MancalaGame = serde_json::from_str(&q.game).expect("invalid game JSON");
+    let pit: Pit = payload.pit;
 
     let new_game = game.make_move(pit).expect("Invalid Move");
     DataHandler::save_data(new_game, game, pit).unwrap(); // Handle the error appropriately in a real application
@@ -98,7 +100,7 @@ pub async fn handle_make_move_request(Query(q): Query<MoveQuery>) -> Json<Mancal
 }
 
 #[utoipa::path(
-    get,
+    post,
     path = "/api/mancala/get_hint_data",
     params(BoardQuery),
     responses(
@@ -118,8 +120,8 @@ pub async fn handle_make_move_request(Query(q): Query<MoveQuery>) -> Json<Mancal
     ),
     tag = "Game"
 )]
-pub async fn handle_get_hint_data_request(Query(q): Query<BoardQuery>) -> Json<HintData> {
-    let game: MancalaGame = serde_json::from_str(&q.game).expect("invalid game JSON");
+pub async fn handle_get_hint_data_request(Json(payload): Json<BoardQuery>) -> Json<HintData> {
+    let game = payload.game;
 
     let hint_data = DataHandler::fetch_hint_data(game).expect("Failed to retrieve hints");
 
@@ -127,7 +129,7 @@ pub async fn handle_get_hint_data_request(Query(q): Query<BoardQuery>) -> Json<H
 }
 
 #[utoipa::path(
-    get,
+    post,
     path = "/api/mancala/simulate",
     params(SimulationQuery),
     responses(
@@ -147,10 +149,10 @@ pub async fn handle_get_hint_data_request(Query(q): Query<BoardQuery>) -> Json<H
     ),
     tag = "Simulation"
 )]
-pub async fn handle_simulate_request(Query(q): Query<SimulationQuery>) -> Json<SimulationResponse> {
+pub async fn handle_simulate_request(Json(payload): Json<SimulationQuery>) -> Json<SimulationResponse> {
     // simulate all or maybe add a limit possible outcomes from a certain point, and return the updated hints obtained after that
-    let game: MancalaGame = serde_json::from_str(&q.game).expect("invalid game JSON");
-    let max_ends: Option<u32> = q.ends;
+    let game = payload.game;
+    let max_ends: Option<u32> = payload.ends;
     
     let ends = DataHandler::simulate_until_moves(game, 0, max_ends).expect("Something went wrong while simulating");
     let hints = DataHandler::fetch_hint_data(game).expect("Failed to retrieve hints");
@@ -179,8 +181,9 @@ pub async fn handle_simulate_request(Query(q): Query<SimulationQuery>) -> Json<S
     ),
     tag = "Debug"
 )]
-pub async fn handle_print_path_request(Query(q): Query<BoardQuery>) -> Json<()> {
-    let game: MancalaGame = serde_json::from_str(&q.game).expect("invalid game JSON");
+pub async fn handle_print_path_request(Query(payload): Query<BoardQuery>) -> Json<()> {
+    let game = payload.game;
+    // let game: MancalaGame = serde_json::from_str(&q.game).expect("invalid game JSON");
 
     let path = DataHandler::fetch_path(game).expect("Failed to retrieve path");
     println!("{:?}", path);
@@ -208,8 +211,8 @@ pub async fn handle_print_path_request(Query(q): Query<BoardQuery>) -> Json<()> 
     ),
     tag = "Debug"
 )]
-pub async fn handle_print_sequence_request(Query(q): Query<PrintSequenceQuery>) -> Json<()> {
-    let code: EncodedGameState = u64::from_str_radix(&q.code, 16).expect("Invalid hex code");
+pub async fn handle_print_sequence_request(Json(payload): Json<PrintSequenceQuery>) -> Json<()> {
+    let code: EncodedGameState = u64::from_str_radix(&payload.code, 16).expect("Invalid hex code");
 
     let sequence = DataHandler::fetch_sequence(code).expect("Failed to retrieve sequence");
     println!("{}", sequence);

@@ -1,12 +1,17 @@
-import MancalaGame from "../models/mancalaGame.model";
-import { Hint, MancalaTurn, Pit, SimulationResult } from "../types/types";
-import { executeGETRequest } from "../utils/requestExecutor";
+import MancalaGame, { MancalaGameDto } from "../models/mancalaGame.model";
+import { Hint, Pit, SimulationResult } from "../types/types";
+import { executeRequest } from "../utils/requestExecutor";
 import Routes from "../utils/routes";
 
 export async function getHintData(game: MancalaGame): Promise<Hint[]> {
-  return await executeGETRequest(
+  return await executeRequest<Hint[]>(
     `${Routes.BASE_URL}${Routes.API_URL}${Routes.ENDPOINTS.GET_HINT_DATA}`,
-    { game: JSON.stringify(game) },
+    {
+      method: "POST",
+      body: JSON.stringify({
+        game,
+      }),
+    },
   );
 }
 
@@ -14,9 +19,15 @@ export async function simulate(
   game: MancalaGame,
   ends: number,
 ): Promise<SimulationResult> {
-  return await executeGETRequest(
+  return await executeRequest<SimulationResult>(
     `${Routes.BASE_URL}${Routes.API_URL}${Routes.ENDPOINTS.SIMULATE_GAME}`,
-    { game: JSON.stringify(game), ends },
+    {
+      method: "POST",
+      body: JSON.stringify({
+        game,
+        ends,
+      }),
+    },
   );
 }
 
@@ -24,16 +35,28 @@ export async function makeMove(
   game: MancalaGame,
   pit: Pit,
 ): Promise<MancalaGame> {
-  let newGame = await executeGETRequest(
+  let newGame = await executeRequest<MancalaGameDto>(
     `${Routes.BASE_URL}${Routes.API_URL}${Routes.ENDPOINTS.MAKE_MOVE}`,
-    { pit, game: JSON.stringify(game) },
+    {
+      method: "POST",
+      body: JSON.stringify({
+        pit,
+        game,
+      }),
+    },
   );
-  return new MancalaGame(newGame.board, newGame.currentTurn as MancalaTurn);
+
+  return new MancalaGame(newGame.board, newGame.currentTurn);
 }
 
 export function printPath(game: MancalaGame): void {
-  executeGETRequest(
+  executeRequest(
     `${Routes.BASE_URL}${Routes.API_URL}${Routes.ENDPOINTS.PRINT_PATH}`,
-    { game: JSON.stringify(game) },
+    {
+      method: "POST",
+      body: JSON.stringify({
+        game,
+      }),
+    },
   );
 }

@@ -1,6 +1,11 @@
 import Constants from "../utils/constants";
 import { MancalaTurn, Pit } from "../types/types";
 
+export interface MancalaGameDto {
+  board: Pit[][];
+  currentTurn: MancalaTurn;
+}
+
 export default class MancalaGame {
   private board: number[][];
   private currentTurn: MancalaTurn;
@@ -13,7 +18,6 @@ export default class MancalaGame {
       ];
       this.currentTurn = currentTurn;
     } else {
-      // this.resetBoard();
       this.board = [
         [0, 4, 4, 4, 4, 4, 4], // Player 1's pits
         [0, 4, 4, 4, 4, 4, 4], // Player 2's pits
@@ -24,8 +28,8 @@ export default class MancalaGame {
 
   resetBoard() {
     this.board = [
-      [0, 4, 4, 4, 4, 4, 4], // Player 1's pits
-      [0, 4, 4, 4, 4, 4, 4], // Player 2's pits
+      [0, 4, 4, 4, 4, 4, 4],
+      [0, 4, 4, 4, 4, 4, 4],
     ];
     this.currentTurn = Constants.PLAYERS.PLAYER1 as MancalaTurn; // Player 1 starts
   }

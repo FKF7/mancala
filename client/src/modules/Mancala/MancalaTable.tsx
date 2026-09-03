@@ -1,9 +1,8 @@
 import { useEffect, useState, useRef } from "react";
+import { toBlob } from "html-to-image";
 import MancalaGame from "../../models/mancalaGame.model";
 import History from "../../models/history";
 import Constants from "../../utils/constants";
-import "../../App.css";
-import "./MancalaTable.css";
 import { Hint } from "../../types/types";
 import MancalaBoard from "./MancalaBoard";
 import { getHintData, printPath, simulate } from "../../lib/requests";
@@ -13,6 +12,9 @@ import ProcessButton from "../../components/ProcessButton/ProcessButton";
 import { SimulationResultStatus } from "../../enums/enums";
 import SimulationResultDialog from "../../components/simulationResultDialog/SimulationResultDialog";
 import FlagButton from "../../components/FlagButton/FlagButton";
+
+import "../../App.css";
+import "./MancalaTable.css";
 
 export default function MancalaTable() {
   const [game, setGame] = useState(() => new MancalaGame());
@@ -46,6 +48,8 @@ export default function MancalaTable() {
     setInterruptSim(true);
   };
 
+  const boardRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (hideHints) {
       setHints(
@@ -77,6 +81,20 @@ export default function MancalaTable() {
     status: SimulationResultStatus.SUCCESS,
     message: "",
   });
+
+  async function copyBoard() {
+    if (!boardRef.current) return;
+
+    const blob = await toBlob(boardRef.current);
+
+    if (!blob) return;
+
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "image/png": blob,
+      }),
+    ]);
+  }
 
   async function onResetButtonClick() {
     let newGame = new MancalaGame();
@@ -150,7 +168,7 @@ export default function MancalaTable() {
 
   return (
     <div>
-      <div className="board-area">
+      <div className="board-area" ref={boardRef}>
         <div className={isSimulating ? "board-disabled" : ""}></div>
         <MancalaBoard
           game={game}
@@ -167,6 +185,9 @@ export default function MancalaTable() {
         )}
       </div>
       <div className="buttons">
+        <button onClick={copyBoard} disabled={isSimulating}>
+          {<img className="icon" src={Constants.IMG.COPY_ICON} alt="Copy" />}
+        </button>
         <button onClick={onHelpButtonClick} disabled={isSimulating}>
           Help!
         </button>

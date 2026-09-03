@@ -8,6 +8,7 @@ import visibleIcon from "../assets/img/visibleIcon.png";
 import forbiddenIcon from "../assets/img/forbiddenIcon.png";
 import backIcon from "../assets/img/backIcon.png";
 import forwardIcon from "../assets/img/forwardIcon.png";
+import copyIcon from "../assets/img/copyIcon.png";
 
 const Constants = Object.freeze({
   NUM_PITS: 6,
@@ -43,6 +44,7 @@ const Constants = Object.freeze({
     FORBIDDEN_ICON: forbiddenIcon,
     BACK_ICON: backIcon,
     FORWARD_ICON: forwardIcon,
+    COPY_ICON: copyIcon,
   },
 });
 

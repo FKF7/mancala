@@ -94,7 +94,7 @@ pub async fn handle_make_move_request(Json(payload): Json<MoveQuery>) -> Json<Ma
     let pit: Pit = payload.pit;
 
     let new_game = game.make_move(pit).expect("Invalid Move");
-    DataHandler::save_data(new_game, game, pit).unwrap(); // Handle the error appropriately in a real application
+    DataHandler::new().save_data(new_game, game, pit).unwrap(); // Handle the error appropriately in a real application
 
     Json(new_game)
 }
@@ -154,7 +154,12 @@ pub async fn handle_simulate_request(Json(payload): Json<SimulationQuery>) -> Js
     let game = payload.game;
     let max_ends: Option<u32> = payload.ends;
     
-    let ends = DataHandler::simulate_until_moves(game, 0, max_ends).expect("Something went wrong while simulating");
+    let total_simulate_time = std::time::Instant::now();
+    let mut data_handler = DataHandler::new();
+    let ends = data_handler.simulate_until_moves(game, 0, max_ends).expect("Something went wrong while simulating");
+    println!("Total simulation time: {:?}", total_simulate_time.elapsed());
+    data_handler.print_timings();
+    
     let hints = DataHandler::fetch_hint_data(game).expect("Failed to retrieve hints");
 
     println!("Simulated until {} ends", ends);

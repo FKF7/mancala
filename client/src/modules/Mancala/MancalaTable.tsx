@@ -85,7 +85,9 @@ export default function MancalaTable() {
   async function copyBoard() {
     if (!boardRef.current) return;
 
-    const blob = await toBlob(boardRef.current);
+    const blob = await toBlob(boardRef.current, {
+      pixelRatio: 2,
+    });
 
     if (!blob) return;
 

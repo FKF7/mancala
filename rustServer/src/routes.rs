@@ -1,4 +1,4 @@
-use axum::{routing::get, routing::post, Router};
+use axum::{routing::post, Router};
 use tower_http::cors::{Any, CorsLayer};
 
 use utoipa::OpenApi;

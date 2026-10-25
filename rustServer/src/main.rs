@@ -2,14 +2,17 @@ mod api_doc;
 mod mancala_controller;
 mod routes;
 mod error;
-mod mancala_game_codec;
+mod mancala_codec;
 mod constants;
 mod types;
 mod mancala_game_model;
 mod mancala_game_data_handler;
+mod hint;
+mod file_path_handler;
+mod mancala_state_file;
 
 use std::net::SocketAddr;
-use crate::mancala_game_data_handler::{MancalaStateFile};
+use crate::mancala_state_file::{MancalaStateFile};
 use crate::constants::DEFAULT_BOARD_CODE;
 
 

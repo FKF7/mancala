@@ -1,222 +1,14 @@
 use crate::constants::*;
-use crate::mancala_game_codec::{MancalaGameCodec};
+use crate::mancala_codec::{MancalaCodec};
 use crate::types::*;
 use crate::mancala_game_model::MancalaGame;
 use crate::error::{CodecError};
-use serde::{Serialize, Deserialize};
-use std::io::{self, Read, Write, Seek, SeekFrom};
-use std::path::{Path, PathBuf};
-use std::fs::OpenOptions;
+use crate::hint::{Hint, HintData, HintType};
+use crate::file_path_handler::FilePathHandler;
+use crate::mancala_state_file::{MancalaStateFile, StateCompletion};
+use std::path::{PathBuf};
 use std::collections::VecDeque;
-use utoipa::ToSchema;
-
-pub struct MancalaStateFile {
-    code: EncodedGameState,
-    path: PathBuf,
-    hints: [EncodedHint; 6],        // Hint possui 2 bits iniciais de controle, e 6 bits correspondentes ao valor
-    parents: Vec<EncodedGameState>  // ISSO PRECISA SER O VALOR JUNTO COM O ÚLTIMO MOVIMENTO! PODE USAR O PRIMEIRO CARACTER HEX PARA ARMAZENAR O MOVIMENTO E MANTER U64
-}
-
-const HINT_MASK_TYPE: EncodedHint = 0xC0;   // 1100 0000
-const HINT_MASK_VALUE: EncodedHint = 0x3F;  // 0011 1111
-
-const HINT_COMPLETED: EncodedHint = 0x80;   // 1000 0000
-const HINT_INVALID: EncodedHint = 0xC0;     // 1100 0000
-const HINT_UNKNOWN: EncodedHint = 0x40;     // 0100 0000
-const HINT_NORMAL: EncodedHint = 0x00;      // 0000 0000
-
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Hint {
-    value: Pebbles,
-    hint_type: EncodedHint
-}
-
-impl Hint {
-    pub fn new_empty() -> Self {
-        Self {
-            value: 0,
-            hint_type: HINT_UNKNOWN
-        }
-    }
-
-    pub fn new(value: Pebbles, hint_type: EncodedHint) -> Self {
-        Self {
-            value,
-            hint_type
-        }
-    }
-}
-
-pub type HintData = [Hint; 6];
-
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum ForwardReason {
-    NoForward,
-    NewBestHint,
-    StateCompletion
-}
-
-impl MancalaStateFile {
-    pub fn new_empty(state_code: EncodedGameState, parent: Option<EncodedGameState>) -> Self {
-
-        let mut hints: [EncodedHint; 6] = [HINT_UNKNOWN; 6];
-
-        for i in 0..NUM_PITS {
-            if MancalaGameCodec::get_pebbles_on_code_pit(state_code, i + 1) == 0 {
-                hints[i] = HINT_INVALID;
-            }
-        }
-
-        Self {
-            code: state_code,
-            path: FilePathHandler::generate_path(state_code),
-            hints,
-            parents: parent.into_iter().collect()
-        }
-    }
-
-    pub fn new_from_read_file(state_code: EncodedGameState) -> io::Result<Self> {
-        let path = FilePathHandler::generate_path(state_code);
-        if path.exists() {
-            return Self::read_file(state_code, Some(path));
-        } else {
-            println!("Path {:?} was not found, dumbass", path);
-            return Err(io::Error::new(io::ErrorKind::NotFound, "File not found"));
-        }
-    }
-
-    pub fn save_as_new(self) -> io::Result<()> {
-        if self.path.exists(){
-            return Ok(());
-        }
-
-        FilePathHandler::create_directory_if_needed(&self.path)?;
-        let mut file = match OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(&self.path) {
-                Ok(file) => file,
-                Err(e) => {
-                    eprintln!("Error opening file: {}", e);
-                    return Err(e);
-                }
-            };
-
-        // hints
-        file.write_all(&self.hints)?;
-
-        // parents
-        for parent in self.parents {
-            file.write_all(&parent.to_be_bytes())?;
-        }
-
-        Ok(())
-    }
-
-    pub fn append_parent_if_needed(&mut self, parent_code: EncodedGameState) -> io::Result<bool> {
-        if !self.parents.contains(&parent_code) {
-            self.parents.push(parent_code);
-            let mut file = OpenOptions::new()
-                .append(true)
-                .open(self.path.clone())?;
-
-            file.write_all(&parent_code.to_be_bytes())?;
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
-    pub fn save_updated_hint(&mut self, pit: Pit, new_hint: EncodedHint) -> io::Result<()> {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .open(self.path.clone())?;
-
-        let offset: u64 = (pit - 1).try_into().unwrap();
-
-        file.seek(SeekFrom::Start(offset))?;
-        file.write_all(&[new_hint])?;
-
-        self.hints[pit - 1] = new_hint;
-
-        Ok(())
-    }
-
-    pub fn get_hint_value(&self, pit: Pit) -> Pebbles {
-        self.hints[pit - 1] & HINT_MASK_VALUE
-    }
-
-    pub fn get_hint_type(&self, pit: Pit) -> u8 {
-        self.hints[pit - 1] & HINT_MASK_TYPE
-    }
-
-    fn get_completed(&self) -> bool {
-        self.hints.iter().all(|&hint| (hint & HINT_MASK_TYPE) >= HINT_COMPLETED) // State is completed if all moves are completed or invalid
-    }
-
-    pub fn get_best_hint_value(&self) -> Pebbles {
-        let mut best_hint_value: Pebbles = 0;
-        for i in 1..=6 {
-            let hint_type = self.get_hint_type(i);
-            let hint_value = self.get_hint_value(i);
-            if (hint_type == HINT_COMPLETED || hint_type == HINT_NORMAL) && hint_value > best_hint_value {
-                best_hint_value = hint_value;
-            }
-        }
-        best_hint_value
-    }
-
-    fn read_file(state_code: EncodedGameState, path: Option<PathBuf>) -> io::Result<Self> {
-        let path = path.unwrap_or_else(|| FilePathHandler::generate_path(state_code));
-        let mut file = match OpenOptions::new()
-            .read(true)
-            .open(&path) {
-                Ok(file) => file,
-                Err(e) => {
-                    eprintln!("Error opening file: {}", e);
-                    return Err(e);
-                }
-            };
-
-        let mut hints = [0u8; 6];
-        let mut parents: Vec<EncodedGameState> = Vec::new();
-
-        file.read_exact(&mut hints)?;
-
-        let mut parent_buffer=  [0u8; 8];
-        while let Ok(_) = file.read_exact(&mut parent_buffer) {
-            let parent = u64::from_be_bytes(parent_buffer);
-            parents.push(parent);
-        }
-
-        Ok(Self { code: state_code, path, hints, parents })
-    }
-}
-
-struct FilePathHandler;
-
-impl FilePathHandler {
-    pub fn generate_path(code: EncodedGameState) -> PathBuf {
-        let hex = format!("{:016X}", code);
-        let trimmed = &hex[1..]; // remove first 0
-
-        PathBuf::from(BASE_DATA_DIR)
-            .join(&trimmed[0..2])
-            .join(&trimmed[2..4])
-            .join(&trimmed[4..6])
-            .join(&trimmed[6..8])
-            .join(&trimmed[8..10])
-            .join(&trimmed[10..12])
-            .join(format!("{}.{}", &trimmed[12..15], DATA_FILE_EXT))
-    }
-
-    fn create_directory_if_needed(path: &Path) -> io::Result<()> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        Ok(())
-    }
-}
+use std::{io, println};
 
 #[derive(Debug)]
 pub enum CodecErrorOrError {
@@ -224,11 +16,22 @@ pub enum CodecErrorOrError {
     Error(io::Error)
 }
 
-pub struct DataHandler;
+pub struct DataHandler {
+    state_stack: Vec<MancalaStateFile>,
+}
 
 impl DataHandler {
+    pub fn new(sim: Option<()>) -> Self {
+        DataHandler {
+            state_stack: match sim {
+                Some(_) => Vec::with_capacity(40),
+                None => Vec::new(),
+            },
+        }
+    }
+
     pub fn fetch_path(mancala_game: MancalaGame) -> Result<PathBuf, CodecErrorOrError> {
-        let state_code = match MancalaGameCodec::encode(&mancala_game, None) {
+        let state_code = match MancalaCodec::encode_game(&mancala_game, None) {
             Ok(code) => code,
             Err(e) => return Err(CodecErrorOrError::CodecError(e))
         };
@@ -243,9 +46,9 @@ impl DataHandler {
         let mut current_code = state_code;
 
         while current_code != EMPTY_BOARD_CODE {
-            let move_pit = MancalaGameCodec::get_move_from_code(current_code);
+            let move_pit = MancalaCodec::get_move_from_game_code(current_code);
             
-            if !MancalaGameCodec::check_free_turn_on_code(current_code, move_pit) {
+            if !MancalaCodec::check_free_turn_on_game_code(current_code, move_pit) {
                 sequence.push_front("\n".to_string());
             }
             sequence.push_front(move_pit.unwrap().to_string());
@@ -255,76 +58,124 @@ impl DataHandler {
                 Err(e) => return Err(CodecErrorOrError::Error(e)),
             };
 
-            if state_file.parents.is_empty() {
+            if state_file.get_parents().is_empty() {
                 break;
             }
-            current_code = state_file.parents[0];
+            current_code = state_file.get_parents()[0];
         }
 
         Ok(sequence.into_iter().collect())
     }
 
-    pub fn fetch_hint_data(mancala_game: MancalaGame) -> Result<HintData, CodecErrorOrError> {
-        let mut hint_data: HintData = [Hint::new_empty(); 6];
+    pub fn fetch_hint_data(mancala_game: MancalaGame, state_code: Option<EncodedGameState>) -> Result<(HintData, Pebbles, Pebbles), CodecErrorOrError> {
+        let state_code = match state_code {
+            Some(code) => code,
+            None => match MancalaCodec::encode_game(&mancala_game, None) {
+                Ok(code) => code,
+                Err(e) => return Err(CodecErrorOrError::CodecError(e))
+            }
+        };
+
         let current_turn = match mancala_game.get_current_turn() {
             Some(turn) => turn,
-            None => return Ok(hint_data)
+            None => return Ok(([Hint::new_empty(0); 6], 0, 0))
         };
+
         let current_mancala = mancala_game.get_pit_pebbles(current_turn, MANCALA_PIT);
-        let state_code = match MancalaGameCodec::encode(&mancala_game, None) {
-            Ok(code) => code,
-            Err(e) => return Err(CodecErrorOrError::CodecError(e))
-        };
 
         let game_state = match MancalaStateFile::new_from_read_file(state_code) {
             Ok(state) => state,
             Err(e) => return Err(CodecErrorOrError::Error(e)),
         };
 
-        for i in 0..NUM_PITS {
-            let value = game_state.get_hint_value(i + 1) + current_mancala;
-            let hint_type = game_state.get_hint_type(i + 1);
-            hint_data[i] = Hint::new(value, hint_type);
-        }
+        let saved_hints = game_state.get_hints();
+        let hint_data: HintData = std::array::from_fn(|i| {
+            Hint::new(
+                saved_hints[i].get_value() + current_mancala,
+                saved_hints[i].get_type(),
+                saved_hints[i].get_min() + current_mancala,
+                saved_hints[i].get_max() + current_mancala
+            )
+        });
 
-        Ok(hint_data)
+        Ok((hint_data, game_state.get_min() + current_mancala, game_state.get_max() + current_mancala))
     }
 
-    pub fn simulate_until_moves(game: MancalaGame, ends_reached: u32, max_ends: Option<u32>) -> io::Result<u32> {
+    pub fn simulate_until_moves(&mut self, game: MancalaGame, ends_reached: u32, max_ends: Option<u32>, prune: bool) -> io::Result<(u32, Option<usize>)> {
         let mut ends_reached = ends_reached;
+        let mut prune_index: Option<usize>;
         if game.get_current_turn() == None {
-            return Ok(ends_reached + 1);
+            return Ok((ends_reached + 1, None));
         }
 
-        let hints = Self::fetch_hint_data(game).expect("Failed to retrieve hints");
-        if hints.iter().all(|hint| hint.hint_type == HINT_COMPLETED || hint.hint_type == HINT_INVALID) {
-            return Ok(ends_reached + 1);
-        }
+        let state_code = MancalaCodec::encode_game(&game, None).expect("Failed to encode game state for simulation");
+        let state = MancalaStateFile::new_from_read_file(state_code)?;
         
+        let mut skipped_all = true;
+        self.state_stack.push(state);
+        let simulation_depth = self.state_stack.len() - 1;
         for i in 1..=NUM_PITS {
             match max_ends {
                 Some(max) => {
                     if (max == 0 && ends_reached >= DEFAULT_MAX_SIMULATION_ENDS) || ends_reached >= max {
-                        return Ok(ends_reached);
+                        self.state_stack.pop();
+                        return Ok((ends_reached, None));
                     };
                 },
                 _ => ()
             }
-            if hints[i - 1].hint_type == HINT_COMPLETED || hints[i - 1].hint_type == HINT_INVALID { continue }
+
+            let hint = self.state_stack[simulation_depth].get_hint(i);
+            match hint.get_type() {
+                HintType::Completed | HintType::Invalid => continue,
+                HintType::PrunedCompleted => if prune { continue } else { skipped_all = false },
+                HintType::Normal => if prune && hint.get_max() <= self.state_stack[simulation_depth].get_min() { continue } else { skipped_all = false },
+                HintType::Unknown => skipped_all = false,
+            }
+
             let next_game = match game.clone().make_move(i) {
                 Ok(game) => { game }
                 Err(_) => { continue }
             };
-            Self::save_data(next_game, game, i)?;
-            ends_reached = Self::simulate_until_moves(next_game, ends_reached, max_ends)?;
+            match self.save_data(next_game, game, i, self.state_stack.len() - 1)? {
+                Some(index) => {
+                    // println!("Pruned at depth {} for move {}, while at simulation depth {}", index, i, simulation_depth);
+                    if index < simulation_depth {
+                        // println!("would have returned here");
+
+                        self.state_stack.pop();
+                        // println!("Pruned at depth {} for move {}", index, i);
+                        return Ok((ends_reached, Some(index)));
+                    }
+                },
+                None => ()
+            }
+            (ends_reached, prune_index) = self.simulate_until_moves(next_game, ends_reached, max_ends, prune)?;
+            match prune_index {
+                Some(index) => {
+                    // println!("Pruned at depth {} for move {}, while at simulation depth {}", index, i, simulation_depth);
+                    if index < simulation_depth {
+                        // println!("would have returned here");
+                        self.state_stack.pop();
+                        // println!("Pruned at depth {} for move {}", index, i);
+                        return Ok((ends_reached, Some(index)));
+                    }
+                },
+                None => ()
+            }
+        }
+        self.state_stack.pop();
+
+        if skipped_all {
+            return Ok((ends_reached + 1, None));
         }
 
-        Ok(ends_reached)
+        Ok((ends_reached, None))
     }
 
-    pub fn save_data(game: MancalaGame, parent_game: MancalaGame, move_pit: Pit) -> io::Result<()> { //returns a bool saying if there were any changes by forwarding or not
-        let state_code = MancalaGameCodec::encode(&game, None).expect("Failed to encode game");
-        let parent_code = MancalaGameCodec::encode(&parent_game, Some(move_pit)).expect("Failed to encode game");
+    pub fn save_data(&self, game: MancalaGame, parent_game: MancalaGame, move_pit: Pit, simulation_depth: usize) -> io::Result<Option<usize>> { // returns a bool representing if the state gets pruned later on
+        let state_code = MancalaCodec::encode_game(&game, None).expect("Failed to encode game");
+        let parent_code = MancalaCodec::encode_game(&parent_game, Some(move_pit)).expect("Failed to encode game");
         let file_path = FilePathHandler::generate_path(state_code);
 
         if !FilePathHandler::generate_path(parent_code).exists() { // If parent doesn't exist, exit
@@ -332,134 +183,156 @@ impl DataHandler {
         }
 
         if !file_path.exists() && state_code != EMPTY_BOARD_CODE {
-            return Self::create_file(state_code, parent_code, Some(file_path));
+            let game_state = MancalaStateFile::new_empty(state_code, Some(parent_code));
+            return match game_state.save_as_new() {
+                Ok(_) => Ok(None),
+                Err(e) => Err(e)
+            };
         } else { // file already exists
             let parent_turn = parent_game.get_current_turn().unwrap();
             let current_turn = match state_code {
                 EMPTY_BOARD_CODE => parent_turn,
                 _ => game.get_current_turn().unwrap()
             };
-            return Self::begin_forward_data_if_needed(
+            return self.begin_forward_data_if_needed(
                 state_code,
                 game.get_pit_pebbles(current_turn, MANCALA_PIT),
                 parent_code,
-                parent_game.get_pit_pebbles(parent_turn, MANCALA_PIT)
+                parent_game.get_pit_pebbles(parent_turn, MANCALA_PIT),
+                simulation_depth
             );
         }
     }
 
-    fn begin_forward_data_if_needed(current_code: EncodedGameState, current_mancala: Pebbles, parent_code: EncodedGameState, parent_mancala: Pebbles) -> io::Result<()> {
+    fn begin_forward_data_if_needed(&self, current_code: EncodedGameState, current_mancala: Pebbles, parent_code: EncodedGameState, parent_mancala: Pebbles, simulation_depth: usize) -> io::Result<Option<usize>> {
         let mut current_state = match current_code {
             EMPTY_BOARD_CODE => MancalaStateFile::new_empty(current_code, Some(parent_code)),
             _ => MancalaStateFile::new_from_read_file(current_code)?
         };
         let parent_included = current_state.append_parent_if_needed(parent_code)?;
 
-        if !current_state.get_completed() && !parent_included {
-            return Ok(())
-        }
-
         if current_code == EMPTY_BOARD_CODE {
-            Self::endgame_forward_data(
+            return self.endgame_forward_data(
                 current_state,
                 parent_mancala,
-                current_mancala
-            )?;
+                current_mancala,
+                simulation_depth
+            );
         } else {
-            Self::forward_data_recursion(
-                current_state,
-                ForwardReason::NewBestHint
-            )?;
+            if (current_state.get_completion() == StateCompletion::Incomplete) && !parent_included {
+                return Ok(None);
+            }
+            let (_, prune_index) = self.forward_data_recursion(current_state, simulation_depth)?;
+            return Ok(prune_index);
         }
-
-        Ok(())
     }
 
-    fn endgame_forward_data(current_state: MancalaStateFile, parent_mancala: Pebbles, endgame_mancala: Pebbles) -> io::Result<()> {
-        let parent_code= current_state.parents[0]; // only one parent should be expected if game end has been reached
+    fn endgame_forward_data(&self, current_state: MancalaStateFile, parent_mancala: Pebbles, endgame_mancala: Pebbles, simulation_depth: usize) -> io::Result<Option<usize>> {
+        let parent_code= current_state.get_parents()[0]; // only one parent should be expected if game end has been reached
 
-        let mut parent_state = match MancalaStateFile::new_from_read_file(parent_code) {
-            Ok(state) => state,
-            Err(e) => return Err(e)
-        };
+        let mut parent_state = MancalaStateFile::new_from_read_file(parent_code)?;
 
-        let move_pit = MancalaGameCodec::get_move_from_code(parent_code).unwrap();
+        let move_pit = MancalaCodec::get_move_from_game_code(parent_code).unwrap();
 
-        if parent_state.get_hint_type(move_pit) == HINT_COMPLETED {
-            return Ok(());
+        if parent_state.get_hint_type(move_pit) == HintType::Completed {
+            return Ok(None);
         }
 
         let pebbles_move: Pebbles = endgame_mancala - parent_mancala;
-
-        let new_hint: EncodedHint = pebbles_move | HINT_COMPLETED;
         
+        let new_hint = Hint::new(pebbles_move, HintType::Completed, pebbles_move, pebbles_move);
         parent_state.save_updated_hint(move_pit, new_hint)?;
 
-        Self::forward_data_recursion(parent_state, ForwardReason::NewBestHint)
+        let (_, prune_index) = self.forward_data_recursion(parent_state, simulation_depth)?;
+        Ok(prune_index)
     }
 
-    fn forward_data_recursion(current_state: MancalaStateFile, reason: ForwardReason) -> io::Result<()> {
+    fn forward_data_recursion(&self, current_state: MancalaStateFile, simulation_depth: usize) -> io::Result<(bool, Option<usize>)> {
         let base_current_best_hint_value = current_state.get_best_hint_value();
+        let mut global_pruned = true;
+        let mut all_completed = true;
+        let mut prune_index = None;
+        let stack_code = match self.state_stack.len() {
+            0 => EMPTY_BOARD_CODE,
+            _ => self.state_stack[simulation_depth].get_code()
+        };
 
-        for parent_code in current_state.parents.clone() {
-            let mut parent_state = match MancalaStateFile::new_from_read_file(parent_code) {
-                Ok(state) => state,
-                Err(e) => {
-                    println!("Was on this path {:?}", current_state.path);
-                    return Err(e)
-                }
+        for parent_code in current_state.get_parents() {
+            let mut parent_state = if MancalaCodec::are_from_same_state(*parent_code, stack_code) {
+                MancalaStateFile::new_from_read_file(*parent_code)?
+            } else {
+                MancalaStateFile::new_from_read_file(*parent_code)?
             };
+            let move_pit = MancalaCodec::get_move_from_game_code(*parent_code).unwrap();
 
-            let move_pit = MancalaGameCodec::get_move_from_code(parent_code).unwrap();
-
-            if parent_state.get_hint_type(move_pit) == HINT_COMPLETED {
-                continue
+            if parent_state.get_hint_type(move_pit) == HintType::Completed {
+                continue;
             }
 
-            let current_pebbles = MancalaGameCodec::get_pebbles_on_code(current_state.code);
-            let parent_pebbles = MancalaGameCodec::get_pebbles_on_code(parent_code);
-            let free_turn_ind = Self::get_free_turn_ind(parent_code);
+            all_completed &= parent_state.get_hint_type(move_pit) == HintType::PrunedCompleted;
+
+            let current_pebbles = MancalaCodec::get_pebbles_on_game_code(current_state.get_code());
+            let parent_pebbles = MancalaCodec::get_pebbles_on_game_code(*parent_code);
+            let pebbles_diff = parent_pebbles - current_pebbles;
+            let free_turn_ind = Self::get_free_turn_ind(*parent_code);
 
             let current_best_hint_value = Self::swap_hint_value_if_needed(current_pebbles, free_turn_ind, base_current_best_hint_value);
-            let pebbles_move = current_best_hint_value + parent_pebbles - current_pebbles;
+            
+            let pebbles_move = current_best_hint_value + pebbles_diff;
 
-            let new_hint: EncodedHint = match reason {
-                ForwardReason::NoForward => panic!("Help"),
-                ForwardReason::StateCompletion => {
-                    match parent_state.get_hint_type(move_pit) {
-                        HINT_UNKNOWN => pebbles_move | HINT_COMPLETED,
-                        HINT_NORMAL => pebbles_move | HINT_COMPLETED,
-                        HINT_COMPLETED => panic!("If the hint is already completed, it shouldn't be forwarding stuff"),
-                        HINT_INVALID => panic!("It should be impossible to be here since this move is impossible"),
-                        _ => panic!("Math doesn't make sense and the universe will explode")
-                    }
-                },
-                ForwardReason::NewBestHint => {
-                    match current_state.get_completed() {
-                        true => pebbles_move | HINT_COMPLETED,
-                        false => pebbles_move
-                    }
+            let min: u8;
+            let max: u8;
+
+            if free_turn_ind {
+                min = current_state.get_min() + pebbles_diff;
+                max = current_state.get_max() + pebbles_diff;
+            } else {
+                min = parent_pebbles - current_state.get_max();
+                max = parent_pebbles - current_state.get_min();
+            }
+
+            let hint_type = match current_state.get_completion() {
+                StateCompletion::Completed => HintType::Completed,
+                StateCompletion::PrunedCompleted => HintType::PrunedCompleted,
+                StateCompletion::Incomplete => if min == max { // quase ctz q posso deixar só normal aqui, mas vai q
+                    HintType::PrunedCompleted
+                } else {
+                    HintType::Normal
                 }
             };
 
+            let new_hint = Hint::new(pebbles_move, hint_type, min, max);
+            if new_hint.equals(&parent_state.get_hint(move_pit)) {
+                continue;
+            }
+
             let best_hint_before = parent_state.get_best_hint_value();
-            let mod_hint_type_before = parent_state.get_hint_type(move_pit);
             
-            parent_state.save_updated_hint(move_pit, new_hint)?;
+            let state_metadata_updated = parent_state.save_updated_hint(move_pit, new_hint)?;
 
             let best_hint_after = parent_state.get_best_hint_value();
 
-            let should_forward = if best_hint_before != best_hint_after || mod_hint_type_before == HINT_UNKNOWN { ForwardReason::NewBestHint }
-                else if parent_state.get_completed() { ForwardReason::StateCompletion }
-                else { ForwardReason::NoForward };
+            let mut local_pruned = new_hint.get_max() <= parent_state.get_min() && new_hint.get_type() == HintType::Normal;
+            prune_index = if local_pruned && MancalaCodec::are_from_same_state(*parent_code, stack_code) { Some(simulation_depth) } else { None };
 
-            match should_forward {
-                ForwardReason::NoForward => (),
-                _ => Self::forward_data_recursion(parent_state, should_forward)?
+            if state_metadata_updated || best_hint_after != best_hint_before {
+                let (forward_prune, forward_prune_index) = self.forward_data_recursion(
+                    parent_state,
+                    if simulation_depth > 0 { simulation_depth - 1 } else { 0 }
+                )?;
+                local_pruned |= forward_prune;
+                match forward_prune_index {
+                    Some(index) => {
+                        prune_index = Some(index);
+                    },
+                    None => ()
+                }
             }
+
+            global_pruned &= local_pruned;
         }
 
-        Ok(())
+        Ok((global_pruned && !all_completed, prune_index))
     }
 
     fn swap_hint_value_if_needed(board_pebbles: Pebbles, free_turn_ind: bool, hint_value: Pebbles) -> Pebbles {
@@ -470,35 +343,6 @@ impl DataHandler {
     }
 
     fn get_free_turn_ind(state_code: EncodedGameState) -> bool {
-        state_code == EMPTY_BOARD_CODE || MancalaGameCodec::check_free_turn_on_code(state_code, None)
-    }
-
-    fn create_file(state_code: EncodedGameState, parent_code: EncodedGameState, file_path: Option<PathBuf>) -> io::Result<()> {
-        let file_path = match file_path {
-            Some(path) => path,
-            None => FilePathHandler::generate_path(state_code)
-        };
-
-        FilePathHandler::create_directory_if_needed(&file_path)?;
-
-        let file_content = MancalaStateFile::new_empty(state_code,Some(parent_code));
-
-        let mut file = match OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(&file_path) {
-                Ok(file) => file,
-                Err(e) => {
-                    eprintln!("Error opening file: {}", e);
-                    return Err(e);
-                }
-            };
-
-        file.write_all(&file_content.hints)?;
-        for parent in file_content.parents {
-            file.write_all(&parent.to_be_bytes())?;
-        }
-
-        Ok(())
+        state_code == EMPTY_BOARD_CODE || MancalaCodec::check_free_turn_on_game_code(state_code, None)
     }
 }

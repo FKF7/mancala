@@ -1,10 +1,10 @@
 import MancalaGame, { MancalaGameDto } from "../models/mancalaGame.model";
-import { Hint, Pit, SimulationResult } from "../types/types";
+import { HintData, Pit, SimulationResult } from "../types/types";
 import { executeRequest } from "../utils/requestExecutor";
 import Routes from "../utils/routes";
 
-export async function getHintData(game: MancalaGame): Promise<Hint[]> {
-  return await executeRequest<Hint[]>(
+export async function getHintData(game: MancalaGame): Promise<HintData> {
+  return await executeRequest<HintData>(
     `${Routes.BASE_URL}${Routes.API_URL}${Routes.ENDPOINTS.GET_HINT_DATA}`,
     {
       method: "POST",
@@ -18,6 +18,7 @@ export async function getHintData(game: MancalaGame): Promise<Hint[]> {
 export async function simulate(
   game: MancalaGame,
   ends: number,
+  prune: boolean = false,
 ): Promise<SimulationResult> {
   return await executeRequest<SimulationResult>(
     `${Routes.BASE_URL}${Routes.API_URL}${Routes.ENDPOINTS.SIMULATE_GAME}`,
@@ -26,6 +27,7 @@ export async function simulate(
       body: JSON.stringify({
         game,
         ends,
+        prune,
       }),
     },
   );

@@ -4,7 +4,7 @@ import History from "../../models/history";
 import Constants from "../../utils/constants";
 import "../../App.css";
 import "./MancalaBoard.css";
-import { MancalaTurn, Pit, Hint } from "../../types/types";
+import { MancalaTurn, Pit, HintData, Hint } from "../../types/types";
 import { makeMove } from "../../lib/requests";
 import MancalaKeyBinds from "./MancalaKeyBinds";
 
@@ -12,7 +12,7 @@ type MancalaBoardProps = {
   game: MancalaGame;
   setGame: React.Dispatch<React.SetStateAction<MancalaGame>>;
   history: History;
-  hints: Hint[];
+  hintData: HintData;
   isSimulating: boolean;
   mancalaKeysHandler: MancalaKeyBinds;
 };
@@ -21,7 +21,7 @@ export default function MancalaBoard({
   game,
   setGame,
   history,
-  hints,
+  hintData,
   isSimulating,
   mancalaKeysHandler,
 }: MancalaBoardProps) {
@@ -101,7 +101,7 @@ export default function MancalaBoard({
     switch (hint?.hintType) {
       case Constants.HINT_TYPE.HIDDEN:
         return (
-          <div className="hint disabled">
+          <div key={`hint-${player}-${hintIndex}`} className="hint disabled">
             <img
               className="pit-icon"
               src={Constants.IMG.HIDDEN_ICON}
@@ -110,21 +110,65 @@ export default function MancalaBoard({
           </div>
         );
       case Constants.HINT_TYPE.NORMAL:
+        let typeClass =
+          hint.min === hintData.min && hint.value === hint.min
+            ? "min-limit"
+            : hint.max < hintData.min && hint.value <= hint.max
+              ? "pruned"
+              : hint.max === hintData.max && hint.value === hint.max
+                ? "max-limit"
+                : "";
         return (
-          <div key={`hint-${player}-${hintIndex}`} className="hint">
-            {hint.value}
+          <div
+            key={`hint-${player}-${hintIndex}`}
+            className={`hint ${typeClass}`}
+          >
+            <span>{hint.value}</span>
+            <div
+              className={`hint-tooltip ${player === Constants.PLAYERS.PLAYER1 ? "player1" : "player2"}`}
+            >
+              <span>Min: {hint.min}</span>
+              <span>Max: {hint.max}</span>
+            </div>
           </div>
         );
       case Constants.HINT_TYPE.UNKNOWN:
         return (
           <div key={`hint-${player}-${hintIndex}`} className="hint unknown">
-            ?
+            <span>?</span>
+            <div
+              className={`hint-tooltip ${player === Constants.PLAYERS.PLAYER1 ? "player1" : "player2"}`}
+            >
+              <span>Min: {hint.min}</span>
+              <span>Max: {hint.max}</span>
+            </div>
           </div>
         );
       case Constants.HINT_TYPE.COMPLETED:
         return (
           <div key={`hint-${player}-${hintIndex}`} className="hint completed">
-            {hint.value}
+            <span>{hint.value}</span>
+            <div
+              className={`hint-tooltip ${player === Constants.PLAYERS.PLAYER1 ? "player1" : "player2"}`}
+            >
+              <span>Min: {hint.min}</span>
+              <span>Max: {hint.max}</span>
+            </div>
+          </div>
+        );
+      case Constants.HINT_TYPE.PRUNED_COMPLETED:
+        return (
+          <div
+            key={`hint-${player}-${hintIndex}`}
+            className="hint pruned-completed"
+          >
+            <span>{hint.value}</span>
+            <div
+              className={`hint-tooltip ${player === Constants.PLAYERS.PLAYER1 ? "player1" : "player2"}`}
+            >
+              <span>Min: {hint.min}</span>
+              <span>Max: {hint.max}</span>
+            </div>
           </div>
         );
       case Constants.HINT_TYPE.INVALID:
@@ -150,7 +194,11 @@ export default function MancalaBoard({
     const hintElements: ReactElement[] = [];
     for (let i = 5; i >= 0; i--) {
       hintElements.push(
-        drawHint(hints[i], Constants.PLAYERS.PLAYER1 as MancalaTurn, i),
+        drawHint(
+          hintData.hints[i],
+          Constants.PLAYERS.PLAYER1 as MancalaTurn,
+          i,
+        ),
       );
     }
     return hintElements;
@@ -160,7 +208,11 @@ export default function MancalaBoard({
     const hintElements: ReactElement[] = [];
     for (let i = 0; i < 6; i++) {
       hintElements.push(
-        drawHint(hints[i], Constants.PLAYERS.PLAYER2 as MancalaTurn, i),
+        drawHint(
+          hintData.hints[i],
+          Constants.PLAYERS.PLAYER2 as MancalaTurn,
+          i,
+        ),
       );
     }
     return hintElements;

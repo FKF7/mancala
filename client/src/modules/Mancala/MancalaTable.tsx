@@ -3,7 +3,7 @@ import { toBlob } from "html-to-image";
 import MancalaGame from "../../models/mancalaGame.model";
 import History from "../../models/history";
 import Constants from "../../utils/constants";
-import { Hint } from "../../types/types";
+import { HintData } from "../../types/types";
 import MancalaBoard from "./MancalaBoard";
 import { getHintData, printPath, simulate } from "../../lib/requests";
 import MancalaKeyBinds from "./MancalaKeyBinds";
@@ -18,7 +18,11 @@ import "./MancalaTable.css";
 
 export default function MancalaTable() {
   const [game, setGame] = useState(() => new MancalaGame());
-  const [hints, setHints] = useState<Hint[]>([]);
+  const [hintData, setHintData] = useState<HintData>({
+    hints: [],
+    min: 0,
+    max: 0,
+  });
   let [hideHints, setHideHints] = useState(true);
   let [isMute, setIsMute] = useState(false);
   let [isSimulating, setIsSimulating] = useState(false);
@@ -52,20 +56,28 @@ export default function MancalaTable() {
 
   useEffect(() => {
     if (hideHints) {
-      setHints(
-        Array(6).fill({
+      setHintData({
+        hints: Array(6).fill({
           hintType: Constants.HINT_TYPE.HIDDEN,
           value: 0,
-        } as Hint),
-      );
+          min: 0,
+          max: 0,
+        }),
+        min: 0,
+        max: 0,
+      });
       return;
     }
 
-    getHintData(game).then((hints) => {
-      if (hints) {
-        setHints(hints);
+    getHintData(game).then((hint_data) => {
+      if (hint_data?.hints) {
+        setHintData(hint_data);
       } else {
-        setHints([]);
+        setHintData({
+          hints: [],
+          min: 0,
+          max: 0,
+        });
       }
     });
   }, [game, hideHints]);
@@ -128,10 +140,14 @@ export default function MancalaTable() {
     let error = false;
 
     do {
-      await simulate(game, 5000)
+      await simulate(game, 5000, true)
         .then((result) => {
           if (result.hints) {
-            setHints(result.hints);
+            setHintData({
+              hints: result.hints,
+              min: result.min,
+              max: result.max,
+            });
             totalEnds += result.ends;
           }
         })
@@ -174,7 +190,7 @@ export default function MancalaTable() {
           game={game}
           setGame={setGame}
           history={history}
-          hints={hints}
+          hintData={hintData}
           isSimulating={isSimulating}
           mancalaKeysHandler={mancalaKeysHandler}
         />

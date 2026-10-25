@@ -11,6 +11,6 @@ pub const DEFAULT_BOARD_CODE: EncodedGameState = 0x0210842108421084;
 pub const EMPTY_BOARD_CODE: EncodedGameState = 0;
 pub const BASE_DATA_DIR: &str = "data";
 pub const DATA_FILE_EXT: &str = "bin";
-pub const BITS_PER_PIT: u8 = 5;
+pub const TEMP_FILE_EXT: &str = "bin.tmp";
 pub const TOTAL_CODE_BITS: u8 = 60;
 pub const DEFAULT_MAX_SIMULATION_ENDS: u32 = 10000;

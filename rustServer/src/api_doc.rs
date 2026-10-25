@@ -1,7 +1,7 @@
 use utoipa::OpenApi;
 
 use crate::mancala_controller::SimulationResponse;
-use crate::mancala_game_data_handler::Hint;
+use crate::hint::Hint;
 use crate::mancala_game_model::MancalaGame;
 
 #[derive(OpenApi)]

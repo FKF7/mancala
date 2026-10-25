@@ -27,10 +27,11 @@ const Constants = Object.freeze({
   FULL_CYCLE: 13,
   HINT_TYPE: {
     NORMAL: 0,
-    UNKNOWN: 64,
-    COMPLETED: 128,
-    INVALID: 192,
-    HIDDEN: 255,
+    UNKNOWN: 1,
+    COMPLETED: 2,
+    PRUNED_COMPLETED: 3,
+    INVALID: 4,
+    HIDDEN: 5,
   },
   SOUNDS: {
     SIMULATION_COMPLETED: new Audio(simulationCompletedSound),

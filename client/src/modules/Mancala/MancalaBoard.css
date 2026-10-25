@@ -84,17 +84,15 @@
   width: 60px;
   height: 30px;
   display: flex;
+  align-items: center;
+  position: relative;
   justify-content: center;
   align-items: center;
   border-radius: 50%;
   font-weight: bold;
   font-size: 18px;
   color: #2f2e2e;
-  background-color: #e0dc02;
-}
-
-.hint.unknown {
-  color: white;
+  background-color: #e2e080;
 }
 
 .hint.disabled {
@@ -102,11 +100,70 @@
 }
 
 .hint.completed {
-  background-color: #73f3e0;
+  background-color: #91f8ff;
+  color: #2f2e2e;
+}
+
+.hint.pruned-completed {
+  background-color: #9dff8a;
+  color: #2f2e2e;
+}
+
+.hint.min-limit {
+  background-color: #ceb4fd;
+  color: 2f2e2e;
+}
+
+.hint.pruned {
+  background-color: #ff9c9c;
+  color: #2f2e2e;
+}
+
+.hint.max-limit {
+  background-color: #deff39;
   color: #2f2e2e;
 }
 
 .pit-icon {
   width: 15px;
   height: 15px;
+}
+
+.hint-tooltip {
+  position: absolute;
+  font-size: 0.8rem;
+
+  display: flex;
+  flex-direction: column;
+
+  min-width: 4rem;
+  padding: 0.5rem 0.75rem;
+
+  background: white;
+  color: #222;
+  border-radius: 50%;
+  border: 1px solid #222;
+
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease;
+
+  /* z-index: 100; */
+}
+
+.hint-tooltip.player1 {
+  bottom: 120%;
+}
+
+.hint-tooltip.player2 {
+  top: 120%;
+}
+
+.hint:hover .hint-tooltip {
+  opacity: 1;
+  visibility: visible;
 }

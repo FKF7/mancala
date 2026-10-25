@@ -2,15 +2,28 @@ use crate::constants::*;
 use crate::types::*;
 use crate::mancala_game_model::MancalaGame;
 use crate::error::CodecError;
+use crate::hint::{Hint, HintType};
 
+const BITS_PER_PIT: u8 = 5;
 const MAX_5_BIT_NUMBER: u8 = 31; // 2^5 - 1
 const LAST_5_BITS_MASK: u64 = 31; // 0001 1111
 const FIRST_4_BITS_MASK: u64 = 0xF000000000000000; // 1111 0000... (4 bits for move, 60 bits for board)
 
-pub struct MancalaGameCodec;
+const HINT_MASK_TYPE: EncodedHint = 0xC0;   // 1100 0000
+const HINT_MASK_VALUE: EncodedHint = 0x3F;  // 0011 1111
 
-impl MancalaGameCodec {
-    pub fn encode(game: &MancalaGame, next_move: Option<Pit>) -> Result<EncodedGameState, CodecError> {
+const HINT_VALUE_BITS: u8 = 6; // 6 bits for hint value (0-63)
+
+const HINT_NORMAL: EncodedHint = 0x00;      // 0000 0000
+const HINT_UNKNOWN: EncodedHint = 0x40;     // 0100 0000
+const HINT_COMPLETED: EncodedHint = 0x80;   // 1000 0000
+const HINT_PRUNED: EncodedHint = 0xC0;      // 1100 0000
+const HINT_INVALID: EncodedHint = 0xFF;     // 1111 1111
+
+pub struct MancalaCodec;
+
+impl MancalaCodec {
+    pub fn encode_game(game: &MancalaGame, next_move: Option<Pit>) -> Result<EncodedGameState, CodecError> {
         // valida turno
         if game.get_current_turn() == None {
             return Ok(EMPTY_BOARD_CODE);
@@ -44,7 +57,7 @@ impl MancalaGameCodec {
         Ok(code)
     }
 
-    pub fn decode(code: EncodedGameState, current_turn: MancalaTurn, current_mancala: Pebbles, opponent_mancala: Pebbles) -> Result<MancalaGame, CodecError> {
+    pub fn decode_game(code: EncodedGameState, current_turn: MancalaTurn, current_mancala: Pebbles, opponent_mancala: Pebbles) -> Result<MancalaGame, CodecError> {
         let mut code: EncodedGameState = code;
 
         if current_turn == None {
@@ -60,11 +73,11 @@ impl MancalaGameCodec {
         };
 
         for board_side in players {
-            for pit in (1..=6).rev() {
+            for pit in (1..=NUM_PITS).rev() {
                 
                 let pebbles = (code & LAST_5_BITS_MASK) as u8;
                 board[board_side][pit] = pebbles;
-                code >>= 5;
+                code >>= BITS_PER_PIT;
             }
         }
 
@@ -83,7 +96,7 @@ impl MancalaGameCodec {
         Ok(MancalaGame::new_from_game(board, current_turn))
     }
 
-    pub fn get_move_from_code(code: EncodedGameState) -> Option<Pit> {
+    pub fn get_move_from_game_code(code: EncodedGameState) -> Option<Pit> {
         let move_pit = ((code & FIRST_4_BITS_MASK) >> TOTAL_CODE_BITS) as Pit;
         if move_pit != 0 {
             Some(move_pit)
@@ -92,28 +105,58 @@ impl MancalaGameCodec {
         }
     }
 
-    pub fn get_pebbles_on_code_pit(state_code: EncodedGameState, pit: Pit) -> Pebbles {
+    pub fn get_pebbles_on_game_code_pit(state_code: EncodedGameState, pit: Pit) -> Pebbles {
         ((state_code >> (BITS_PER_PIT * (NUM_PITS - pit) as u8)) & LAST_5_BITS_MASK) as Pebbles
     }
 
-    pub fn check_free_turn_on_code(game_code: EncodedGameState, move_pit: Option<Pit>) -> bool {
+    pub fn check_free_turn_on_game_code(game_code: EncodedGameState, move_pit: Option<Pit>) -> bool {
         let move_pit = match move_pit {
             Some(p) => p,
-            None => match Self::get_move_from_code(game_code) { // If move_pit is None, it should be extracted from the code
+            None => match Self::get_move_from_game_code(game_code) { // If move_pit is None, it should be extracted from the code
                 Some(p) => p,
                 None => return false, // if no move, can't be free turn
             },
         };
-        let pit_pebbles = Self::get_pebbles_on_code_pit(game_code, move_pit);
+        let pit_pebbles = Self::get_pebbles_on_game_code_pit(game_code, move_pit);
         (pit_pebbles % 13) as i8 - move_pit as i8 == 0
     }
 
-    pub fn get_pebbles_on_code(game_code: EncodedGameState) -> Pebbles {
+    pub fn get_pebbles_on_game_code(game_code: EncodedGameState) -> Pebbles {
         let mut pebbles: Pebbles = 0;
         for i in 0..12 {
             pebbles += ((game_code >> (BITS_PER_PIT * (11 - i))) & LAST_5_BITS_MASK) as Pebbles;
         }
         pebbles
+    }
+    
+    pub fn encode_hint(hint: &Hint) -> EncodedHint {
+        if hint.get_type() == HintType::Invalid {
+            return HINT_INVALID;
+        }
+
+        let code: EncodedHint = hint.get_type() as EncodedHint;
+        (code << HINT_VALUE_BITS) + hint.get_value()
+    }
+
+    pub fn decode_hint(code: EncodedHint) -> (u8, HintType) {
+        if code == HINT_INVALID {
+            return (0, HintType::Invalid);
+        }
+
+        let hint_type = match code & HINT_MASK_TYPE {
+            HINT_NORMAL => HintType::Normal,
+            HINT_UNKNOWN => HintType::Unknown,
+            HINT_COMPLETED => HintType::Completed,
+            HINT_PRUNED => HintType::PrunedCompleted,
+            _ => HintType::Invalid,
+        };
+        let value = code & HINT_MASK_VALUE;
+
+        (value, hint_type)
+    }
+
+    pub fn are_from_same_state(code1: EncodedGameState, code2: EncodedGameState) -> bool {
+        (code1 & !FIRST_4_BITS_MASK) == (code2 & !FIRST_4_BITS_MASK)
     }
 }
 
@@ -133,7 +176,7 @@ mod encode_tests {
         let next_move = Some(4);
         let expected_code: EncodedGameState = 0x4210842108421084;
 
-        let code = MancalaGameCodec::encode(&game, next_move).unwrap();
+        let code = MancalaCodec::encode_game(&game, next_move).unwrap();
         assert_eq!(code, expected_code, "Encoded game does not match expected code");
     }
 
@@ -149,7 +192,7 @@ mod encode_tests {
         let next_move = Some(1);
         let expected_code: EncodedGameState = 0x121084210A528084;
 
-        let code = MancalaGameCodec::encode(&original_game, next_move).unwrap();
+        let code = MancalaCodec::encode_game(&original_game, next_move).unwrap();
         assert_eq!(code, expected_code, "Encoded game does not match expected code");
     }
 
@@ -165,7 +208,7 @@ mod encode_tests {
         let next_move = Some(5);
         let expected_code: EncodedGameState = 0x5014A021084294A5;
 
-        let code = MancalaGameCodec::encode(&original_game, next_move).unwrap();
+        let code = MancalaCodec::encode_game(&original_game, next_move).unwrap();
         assert_eq!(code, expected_code, "Encoded game does not match expected code");
     }
 
@@ -181,7 +224,7 @@ mod encode_tests {
         let next_move = None;
         let expected_code: EncodedGameState = 0x0504203800148081;
 
-        let code = MancalaGameCodec::encode(&original_game , next_move).unwrap();
+        let code = MancalaCodec::encode_game(&original_game , next_move).unwrap();
         assert_eq!(code, expected_code, "Encoded game does not match expected code");
     }
 
@@ -197,7 +240,7 @@ mod encode_tests {
         let next_move = None;
         let expected_code: EncodedGameState = 0x000020105C100401;
 
-        let code = MancalaGameCodec::encode(&original_game, next_move).unwrap();
+        let code = MancalaCodec::encode_game(&original_game, next_move).unwrap();
         assert_eq!(code, expected_code, "Encoded game does not match expected code");
     }
 }
@@ -220,7 +263,7 @@ mod decode_tests {
             Some(PLAYER1)
         );
 
-        let decoded_game = MancalaGameCodec::decode(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
+        let decoded_game = MancalaCodec::decode_game(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
         assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
     }
 
@@ -238,7 +281,7 @@ mod decode_tests {
             Some(PLAYER1)
         );
 
-        let decoded_game = MancalaGameCodec::decode(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
+        let decoded_game = MancalaCodec::decode_game(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
         assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
     }
 
@@ -256,7 +299,7 @@ mod decode_tests {
             Some(PLAYER2)
         );
         
-        let decoded_game = MancalaGameCodec::decode(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
+        let decoded_game = MancalaCodec::decode_game(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
         assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
     }
 
@@ -274,7 +317,7 @@ mod decode_tests {
             Some(PLAYER1)
         );
 
-        let decoded_game = MancalaGameCodec::decode(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
+        let decoded_game = MancalaCodec::decode_game(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
         assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
     }
 
@@ -292,7 +335,7 @@ mod decode_tests {
             Some(PLAYER2)
         );
 
-        let decoded_game = MancalaGameCodec::decode(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
+        let decoded_game = MancalaCodec::decode_game(original_code, current_turn, current_mancala, opponent_mancala).unwrap();
         assert_eq!(expected_game, decoded_game, "Decoded game does not match expected game");
     }
 }
@@ -304,28 +347,28 @@ mod get_move_from_code_tests {
     #[test]
     fn new_board() {
         let board_code: EncodedGameState = 0x4210842108421084;
-        let move_pit = MancalaGameCodec::get_move_from_code(board_code);
+        let move_pit = MancalaCodec::get_move_from_game_code(board_code);
         assert_eq!(move_pit, Some(4), "Code with first hex as 4 should return move 4");
     }
 
     #[test]
     fn move_1() {
         let board_code: EncodedGameState = 0x121084210A528084;
-        let move_pit = MancalaGameCodec::get_move_from_code(board_code);
+        let move_pit = MancalaCodec::get_move_from_game_code(board_code);
         assert_eq!(move_pit, Some(1), "Code with first hex as 1 should return move 1");
     }
 
     #[test]
     fn move_2() {
         let board_code: EncodedGameState = 0x5014A021084294A5;
-        let move_pit = MancalaGameCodec::get_move_from_code(board_code);
+        let move_pit = MancalaCodec::get_move_from_game_code(board_code);
         assert_eq!(move_pit, Some(5), "Code with first hex as 5 should return move 5");
     }
 
     #[test]
     fn no_move() {
         let board_code: EncodedGameState = 0x0014A021084294A5; // first hex is 0
-        let move_pit = MancalaGameCodec::get_move_from_code(board_code);
+        let move_pit = MancalaCodec::get_move_from_game_code(board_code);
         assert_eq!(move_pit, None, "Code with first hex as 0 should return None for move");
     }
 }
@@ -337,37 +380,37 @@ mod check_free_turn_on_code_tests {
     #[test]
     fn new_board() {
         let board_code: EncodedGameState = 0x0210842108421084;
-        assert!(MancalaGameCodec::check_free_turn_on_code(board_code, Some(4)), "Move on pit 4 should result in free turn");
+        assert!(MancalaCodec::check_free_turn_on_game_code(board_code, Some(4)), "Move on pit 4 should result in free turn");
     }
 
     #[test]
     fn move_1() {
         let board_code: EncodedGameState = 0x021084210A528084;
-        assert!(!MancalaGameCodec::check_free_turn_on_code(board_code, Some(1)), "Move on pit 1 should not result in free turn");
+        assert!(!MancalaCodec::check_free_turn_on_game_code(board_code, Some(1)), "Move on pit 1 should not result in free turn");
     }
 
     #[test]
     fn move_2() {
         let board_code: EncodedGameState = 0x0014A021084294A5;
-        assert!(MancalaGameCodec::check_free_turn_on_code(board_code, Some(5)), "Move on pit 5 should result in free turn");
+        assert!(MancalaCodec::check_free_turn_on_game_code(board_code, Some(5)), "Move on pit 5 should result in free turn");
     }
 
     #[test]
     fn some_board() {
         let board_code: EncodedGameState = 0x000020105C100401;
-        assert!(MancalaGameCodec::check_free_turn_on_code(board_code, Some(1)), "Move on pit 1 should result in free turn");
+        assert!(MancalaCodec::check_free_turn_on_game_code(board_code, Some(1)), "Move on pit 1 should result in free turn");
     }
 
     #[test]
     fn new_board_w_move() {
         let board_code: EncodedGameState = 0x4210842108421084;
-        assert!(MancalaGameCodec::check_free_turn_on_code(board_code, None), "Move on pit 4 should result in free turn");
+        assert!(MancalaCodec::check_free_turn_on_game_code(board_code, None), "Move on pit 4 should result in free turn");
     }
 
     #[test]
     fn some_board_w_no_move() {
         let board_code: EncodedGameState = 0x000020105C100401;
-        assert!(!MancalaGameCodec::check_free_turn_on_code(board_code, None), "No move passed and no move on code should return false");
+        assert!(!MancalaCodec::check_free_turn_on_game_code(board_code, None), "No move passed and no move on code should return false");
     }
 }
 
@@ -379,34 +422,34 @@ mod get_pebbles_on_code_tests {
     fn new_board() {
         let code: EncodedGameState = 0x0210842108421084;
         let expected_pebbles: Pebbles = 48;
-        assert_eq!(expected_pebbles, MancalaGameCodec::get_pebbles_on_code(code), "Pebbles count from code does not match expected pebbles");
+        assert_eq!(expected_pebbles, MancalaCodec::get_pebbles_on_game_code(code), "Pebbles count from code does not match expected pebbles");
     }
 
     #[test]
     fn move_1() {
         let code: EncodedGameState = 0x021084210A528084;
         let expected_pebbles: Pebbles = 47;
-        assert_eq!(expected_pebbles, MancalaGameCodec::get_pebbles_on_code(code), "Pebbles count from code does not match expected pebbles");
+        assert_eq!(expected_pebbles, MancalaCodec::get_pebbles_on_game_code(code), "Pebbles count from code does not match expected pebbles");
     }
 
     #[test]
     fn move_2() {
         let code: EncodedGameState = 0x0014A021084294A5;
         let expected_pebbles: Pebbles = 46;
-        assert_eq!(expected_pebbles, MancalaGameCodec::get_pebbles_on_code(code), "Pebbles count from code does not match expected pebbles");
+        assert_eq!(expected_pebbles, MancalaCodec::get_pebbles_on_game_code(code), "Pebbles count from code does not match expected pebbles");
     }
 
     #[test]
     fn some_board1() {
         let code: EncodedGameState = 0x0504203800148081;
         let expected_pebbles: Pebbles = 34;
-        assert_eq!(expected_pebbles, MancalaGameCodec::get_pebbles_on_code(code), "Pebbles count from code does not match expected pebbles");
+        assert_eq!(expected_pebbles, MancalaCodec::get_pebbles_on_game_code(code), "Pebbles count from code does not match expected pebbles");
     }
 
     #[test]
     fn some_board2() {
         let code: EncodedGameState = 0x000020105C100401;
         let expected_pebbles: Pebbles = 21;
-        assert_eq!(expected_pebbles, MancalaGameCodec::get_pebbles_on_code(code), "Pebbles count from code does not match expected pebbles");
+        assert_eq!(expected_pebbles, MancalaCodec::get_pebbles_on_game_code(code), "Pebbles count from code does not match expected pebbles");
     }
 }
